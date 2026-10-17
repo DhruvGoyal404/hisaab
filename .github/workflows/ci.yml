@@ -1,0 +1,51 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**/*.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**/*.md', 'docs/**']
+
+# Minutes are shared with other private repos: one job, superseded runs cancelled.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:18.6-alpine3.24@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+        env:
+          POSTGRES_USER: hisaab
+          POSTGRES_PASSWORD: hisaab_ci
+          POSTGRES_DB: hisaab
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U hisaab -d hisaab"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgres://hisaab:hisaab_ci@127.0.0.1:5432/hisaab?sslmode=disable
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Migrate
+        run: npx dbmate --no-dump-schema --wait up
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Integration tests
+        run: npm run test:int
