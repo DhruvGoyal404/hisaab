@@ -1,0 +1,29 @@
+{
+  "name": "hisaab",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "api",
+    "web"
+  ],
+  "engines": {
+    "node": ">=22.13.0 <23"
+  },
+  "scripts": {
+    "dev:api": "npm run dev -w api",
+    "dev:web": "npm run dev -w web",
+    "typecheck": "npm run typecheck -w api && npm run typecheck -w web",
+    "lint": "eslint .",
+    "test": "npm test -w api && npm test -w web",
+    "test:int": "npm run test:int -w api"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "dbmate": "2.36.0",
+    "eslint": "10.12.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.0"
+  }
+}
