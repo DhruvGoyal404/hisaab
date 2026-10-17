@@ -64,6 +64,36 @@ export async function sqlState(p: Promise<unknown>): Promise<string> {
 export const balanceOf = (balances: { memberId: string; balanceMinor: number }[], memberId: string): number | undefined =>
   balances.find((b) => b.memberId === memberId)?.balanceMinor;
 
+/**
+ * Recomputes every member's balance from the current (head) expense versions and unvoided
+ * settlements, independently of the journal, and returns both views keyed by member.
+ */
+export async function ledgerVsHeads(pool: pg.Pool, groupId: string): Promise<{ journal: Record<string, number>; heads: Record<string, number> }> {
+  const toMap = (rows: { member_id: string; amount: number }[]) =>
+    Object.fromEntries(rows.filter((r) => r.amount !== 0).map((r) => [r.member_id, r.amount]));
+  const { rows: journal } = await pool.query<{ member_id: string; amount: number }>(
+    'select member_id, sum(delta_minor)::bigint as amount from ledger_entries where group_id = $1 group by member_id',
+    [groupId],
+  );
+  const { rows: heads } = await pool.query<{ member_id: string; amount: number }>(
+    `select member_id, sum(d)::bigint as amount from (
+       select l.member_id, l.paid_minor - l.owed_minor as d
+         from expenses e
+         join expense_versions v on v.expense_id = e.id and v.version = e.head_version
+         join expense_lines l on l.expense_id = v.expense_id and l.version = v.version
+        where e.group_id = $1
+       union all
+       select s.from_member_id, s.amount_minor from settlements s
+        where s.group_id = $1 and not exists (select 1 from settlement_voids x where x.settlement_id = s.id)
+       union all
+       select s.to_member_id, -s.amount_minor from settlements s
+        where s.group_id = $1 and not exists (select 1 from settlement_voids x where x.settlement_id = s.id)
+     ) t group by member_id`,
+    [groupId],
+  );
+  return { journal: toMap(journal), heads: toMap(heads) };
+}
+
 export async function journalTotal(pool: pg.Pool, groupId: string): Promise<number> {
   const { rows } = await pool.query<{ total: number }>(
     'select coalesce(sum(delta_minor), 0)::bigint as total from ledger_entries where group_id = $1',
