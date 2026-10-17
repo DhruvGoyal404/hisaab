@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+const DEV_LOGIN_ENVS: readonly string[] = ['development', 'test'];
+
+export function devLoginAllowed(nodeEnv: string): boolean {
+  return DEV_LOGIN_ENVS.includes(nodeEnv);
+}
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']),
   HOST: z.string().min(1).default('127.0.0.1'),
@@ -12,6 +18,15 @@ const schema = z.object({
     .default('http://localhost:5174')
     .transform((s) => s.split(',').map((o) => o.trim()).filter(Boolean))
     .pipe(z.array(z.url()).min(1)),
+  DEV_LOGIN: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+}).superRefine((env, ctx) => {
+  if (env.DEV_LOGIN && !devLoginAllowed(env.NODE_ENV)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['DEV_LOGIN'],
+      message: `dev login may only be enabled when NODE_ENV is ${DEV_LOGIN_ENVS.join(' or ')}`,
+    });
+  }
 });
 
 export type Config = {
@@ -21,6 +36,7 @@ export type Config = {
   databaseUrl: string;
   logLevel: string;
   webOrigins: string[];
+  devLogin: boolean;
 };
 
 export class ConfigError extends Error {
@@ -42,5 +58,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     databaseUrl: e.DATABASE_URL,
     logLevel: e.LOG_LEVEL,
     webOrigins: e.WEB_ORIGINS,
+    devLogin: e.DEV_LOGIN,
   };
 }

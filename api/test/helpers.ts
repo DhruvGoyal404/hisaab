@@ -2,6 +2,7 @@ import { pino } from 'pino';
 import { createApp } from '../src/app.js';
 import { loadConfig, type Config } from '../src/config.js';
 import { createPool } from '../src/db.js';
+import { MemorySessionStore } from '../src/sessions.js';
 
 export const WEB_ORIGIN = 'http://localhost:5174';
 
@@ -23,5 +24,6 @@ export function buildApp(overrides: Record<string, string> = {}) {
   const config = testConfig(overrides);
   const logger = pino({ level: 'silent' });
   const pool = createPool(config.databaseUrl, logger);
-  return { app: createApp({ config, logger, pool }), pool, config };
+  const sessions = new MemorySessionStore();
+  return { app: createApp({ config, logger, pool, sessions }), pool, config, sessions };
 }
