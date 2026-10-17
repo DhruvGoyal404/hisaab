@@ -7,12 +7,15 @@ export class HttpError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly details?: Record<string, unknown>,
   ) {
     super(message);
   }
 }
 
-export type ErrorBody = { error: { code: string; message: string; issues?: { path: string; message: string }[] } };
+export type ErrorBody = {
+  error: { code: string; message: string; issues?: { path: string; message: string }[]; details?: Record<string, unknown> };
+};
 
 /** body-parser errors (malformed JSON, too large, bad charset) carry a 4xx status and `expose: true`. */
 function isClientParserError(err: unknown): err is { status: number; type: string; expose: true } {
@@ -36,7 +39,7 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, next) 
 
   if (err instanceof HttpError) {
     status = err.status;
-    body = { error: { code: err.code, message: err.message } };
+    body = { error: { code: err.code, message: err.message, ...(err.details && { details: err.details }) } };
   } else if (err instanceof ZodError) {
     status = 400;
     body = {

@@ -1,6 +1,14 @@
 import pg from 'pg';
 import type { Logger } from 'pino';
 
+// node-pg returns int8 (paise, seq) as strings. Parse to number, refusing anything a JS number
+// can't hold exactly; amounts are capped far below that, so this only fires on a bug.
+pg.types.setTypeParser(pg.types.builtins.INT8, (value: string) => {
+  const n = Number(value);
+  if (!Number.isSafeInteger(n)) throw new RangeError(`int8 value ${value} is outside the safe integer range`);
+  return n;
+});
+
 export function createPool(databaseUrl: string, logger: Logger): pg.Pool {
   const pool = new pg.Pool({
     connectionString: databaseUrl,
