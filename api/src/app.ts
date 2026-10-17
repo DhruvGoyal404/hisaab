@@ -7,11 +7,10 @@ import { devLoginRouter } from './devLogin.js';
 import { errorHandler, notFound } from './errors.js';
 import { healthRouter } from './health.js';
 import { requireAllowedOrigin } from './origin.js';
-import { MemorySessionStore, type SessionStore } from './sessions.js';
 
-export type AppDeps = { config: Config; logger: Logger; pool: pg.Pool; sessions?: SessionStore };
+export type AppDeps = { config: Config; logger: Logger; pool: pg.Pool };
 
-export function createApp({ config, logger, pool, sessions = new MemorySessionStore() }: AppDeps): Express {
+export function createApp({ config, logger, pool }: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
 
@@ -23,7 +22,7 @@ export function createApp({ config, logger, pool, sessions = new MemorySessionSt
   api.use(healthRouter(pool));
   if (config.devLogin) {
     logger.warn('dev login enabled: anyone can sign in as any name');
-    api.use(devLoginRouter(config.nodeEnv, sessions));
+    api.use(devLoginRouter(config.nodeEnv, pool));
   }
   app.use('/api', api);
 

@@ -1,50 +1,47 @@
 import { createHash, randomBytes } from 'node:crypto';
+import type pg from 'pg';
 
 export const SESSION_COOKIE = 'hisaab_session';
-export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const SESSION_TTL_DAYS = 7;
 
-/** 256-bit opaque token handed to the client. Only its hash is ever stored. */
+/** 256-bit opaque token handed to the client. Only its SHA-256 is stored (no salt needed at this entropy). */
 export function newSessionToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
-export function hashSessionToken(token: string): string {
-  return createHash('sha256').update(token).digest('hex');
+export function hashSessionToken(token: string): Buffer {
+  return createHash('sha256').update(token).digest();
 }
 
-export type Session = { userName: string; expiresAt: number };
+export type Session = { sessionId: string; userId: string; userName: string; expiresAt: Date };
 
-export interface SessionStore {
-  create(tokenHash: string, session: Session): Promise<void>;
-  get(tokenHash: string): Promise<Session | undefined>;
-  delete(tokenHash: string): Promise<void>;
+export async function createSession(
+  pool: pg.Pool,
+  userId: string,
+  userAgent?: string,
+): Promise<{ token: string; expiresAt: Date }> {
+  const token = newSessionToken();
+  const { rows } = await pool.query<{ expires_at: Date }>(
+    `insert into sessions (user_id, token_hash, expires_at, user_agent)
+     values ($1, $2, now() + make_interval(days => $3), $4) returning expires_at`,
+    [userId, hashSessionToken(token), SESSION_TTL_DAYS, userAgent?.slice(0, 200) ?? null],
+  );
+  const expiresAt = rows[0]?.expires_at;
+  if (!expiresAt) throw new Error('insert returned no row');
+  return { token, expiresAt };
 }
 
-/** In-process store for the dev login. Phase 2 replaces it with the Postgres `sessions` table. */
-export class MemorySessionStore implements SessionStore {
-  /** Visible for tests: the store holds hashes, never raw tokens. */
-  get hashes(): string[] {
-    return [...this.byHash.keys()];
-  }
+/** The live session for a token: not revoked, not expired, user not disabled. */
+export async function findSession(pool: pg.Pool, token: string): Promise<Session | undefined> {
+  const { rows } = await pool.query<Session>(
+    `select s.id as "sessionId", s.user_id as "userId", u.display_name as "userName", s.expires_at as "expiresAt"
+       from sessions s join users u on u.id = s.user_id
+      where s.token_hash = $1 and s.revoked_at is null and s.expires_at > now() and u.disabled_at is null`,
+    [hashSessionToken(token)],
+  );
+  return rows[0];
+}
 
-  private readonly byHash = new Map<string, Session>();
-
-  create(tokenHash: string, session: Session): Promise<void> {
-    this.byHash.set(tokenHash, session);
-    return Promise.resolve();
-  }
-
-  get(tokenHash: string): Promise<Session | undefined> {
-    const session = this.byHash.get(tokenHash);
-    if (session && session.expiresAt <= Date.now()) {
-      this.byHash.delete(tokenHash);
-      return Promise.resolve(undefined);
-    }
-    return Promise.resolve(session);
-  }
-
-  delete(tokenHash: string): Promise<void> {
-    this.byHash.delete(tokenHash);
-    return Promise.resolve();
-  }
+export async function revokeSession(pool: pg.Pool, token: string): Promise<void> {
+  await pool.query('update sessions set revoked_at = now() where token_hash = $1 and revoked_at is null', [hashSessionToken(token)]);
 }
