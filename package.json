@@ -15,7 +15,11 @@
     "typecheck": "npm run typecheck -w api && npm run typecheck -w web",
     "lint": "eslint .",
     "test": "npm test -w api && npm test -w web",
-    "test:int": "npm run test:int -w api"
+    "test:int": "npm run test:int -w api",
+    "db:up": "docker compose up -d --wait db",
+    "db:migrate": "dbmate --env-file api/.env --no-dump-schema --wait up",
+    "db:rollback": "dbmate --env-file api/.env --no-dump-schema rollback",
+    "db:new": "dbmate new"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
