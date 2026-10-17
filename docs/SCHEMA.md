@@ -1,6 +1,6 @@
 # Hisaab: schema proposal (Phase 2, step 1)
 
-**Status:** proposal for review. No migrations have been written. The full DDL is at the end, in [Appendix A](#appendix-a-full-ddl), in the order it will run.
+**Status:** implemented in Phase 2 as `db/migrations/20261018000001-3_*.sql`, after review. Appendix A shows the reviewed proposal. The migrations are authoritative where they differ, and §8 and §14 note the one change: a merged ghost may still appear on new lines.
 
 **Validation:** I loaded that DDL into a throwaway database on the project's Postgres 18.6 container (since dropped) and ran a smoke script as the app role. It covers every rule below, including the failure cases: each one was rejected with the expected error. The real migrations and their automated tests come after your review. The test plan is in [§13](#13-test-plan-for-the-migrations).
 
@@ -189,7 +189,7 @@ It runs in the same transaction as the group lock and the membership change. If 
 | plain | not a member | New membership. If they once left, their old row is reactivated instead, so their history stays theirs |
 | plain | already active | Roll back (invite not consumed); 409 "already a member" |
 | ghost | not a member | **Claim:** `update memberships set user_id = $user, display_name = null where id = $ghost and user_id is null and status = 'active'`. Every past expense and settlement is now theirs, through one row update. 0 rows (already claimed or merged) → roll back, 409 |
-| ghost | already active | **Merge:** ghost → `status = 'merged'`, `merged_into = <their membership>`. Balance queries resolve `coalesce(merged_into, id)`, so both histories show as one person. Old lines keep pointing at the ghost row; new lines must use the real member (the trigger rejects merged members). Final and one level only (the target must be an active real member) |
+| ghost | already active | **Merge:** ghost → `status = 'merged'`, `merged_into = <their membership>`. Balance queries resolve `coalesce(merged_into, id)`, so both histories show as one person. Old lines keep pointing at the ghost row. A merged ghost counts as active while the member it merged into is active (`effective_member()`), so an expense with lines for both stays valid through edits, deletes and restores, and new lines may use either row. Final and one level only (the target must be an active real member) |
 | ghost | left earlier | Reactivate their old row, then merge the ghost into it, all in one transaction |
 
 **The activity row records:** the ghost's former name, plus the merge as `member.claimed` or `member.merged`, so the feed can say "Dev claimed 'Chirag'".
@@ -381,7 +381,11 @@ These run as integration tests against real Postgres, connected **as the app rol
 - **Authorization:** another group's ids return 404 from every endpoint.
 - **Phase 3 hook:** a property test generates random operation sequences and asserts Σ balances = 0 and journal = Σ head-version lines after each step.
 
-## 14. Decisions I need from you
+## 14. Decisions (resolved 2026-10-18)
+
+Resolved: merge, keeping the ghost row linked and lines for both valid (tested in `api/test/ghosts.int.test.ts`). Members who left lose read access. Any member can edit or delete; the activity log records who. Balances are computed from the journal. Confirmed: the ₹100 crore cap and 0.01% precision. Restore after delete stays.
+
+Original questions:
 
 1. **Claimer is already in the group:** I propose **merge** (§8). The alternative is to refuse and make them pick one identity, which is simpler but means re-entering expenses.
 2. **Can a member who left still read the group's history?** I propose **no**: they get the same 404 as a stranger, and rejoining restores access.
