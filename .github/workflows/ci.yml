@@ -41,6 +41,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
       - name: Migrate
         run: npx dbmate --no-dump-schema --wait up
       - run: npm run typecheck

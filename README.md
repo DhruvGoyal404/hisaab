@@ -9,7 +9,7 @@ Work in progress. See [CLAUDE.md](CLAUDE.md) for the architecture, phase plan an
 Requires Node 22 and Docker.
 
 ```sh
-npm install
+npm ci
 docker compose up -d db
 cp api/.env.example api/.env
 npm run db:migrate

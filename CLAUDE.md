@@ -19,7 +19,7 @@ The audit and the full design rationale (domain model, rounding rule, debt simpl
 ## Commands
 
 ```sh
-npm install                      # root; npm workspaces: api, web
+npm ci                           # root; npm workspaces: api, web. Installs exactly what package-lock.json says
 docker compose up -d db          # Postgres 18 on localhost:5434 (project "hisaab")
 npm run db:migrate               # dbmate up (uses DATABASE_URL, see api/.env.example)
 npm run dev:api                  # API on :8081
@@ -48,7 +48,8 @@ npm run test:int                 # API integration tests; needs Postgres + DATAB
 - **The activity log is append-only, enforced by the DB** (trigger plus REVOKE), not just by app code.
 - **Sessions are opaque tokens, stored hashed (SHA-256) at rest.** No JWT. HttpOnly cookie. **Origin check on every non-GET request.**
 - **Clients never write over the socket.** All writes go through REST; sockets only notify.
-- **Dependencies: exact versions pinned, and only releases at least 14 days old.** `.npmrc` has `save-exact=true`; install new packages with `npm install <pkg>@<version> --before=<date 14 days ago>`.
+- **Dependencies: exact versions pinned, and only releases at least 14 days old.** `.npmrc` has `save-exact=true`. Normal installs and CI use `npm ci` (lockfile only, no resolution). The `--before` cutoff applies only when adding or upgrading: `npm install <pkg>@<version> --before=<date 14 days ago>`, which also keeps newly resolved transitive deps at least 14 days old. CI fails on `npm audit --audit-level=high`.
+- Node stays on the machine's 22.19 while CodeJudge runs, so React Router 7 and jsdom 29 (their next majors need Node ≥ 22.22).
 - The dev login (`/api/dev/login`) exists only when `NODE_ENV` is `development` or `test`; the API refuses to start if it is enabled anywhere else.
 
 ## Coexistence rules (shared machine)
