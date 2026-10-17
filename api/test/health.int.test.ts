@@ -1,11 +1,8 @@
 import request from 'supertest';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, inject, it } from 'vitest';
 import { buildApp } from './helpers.js';
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error('integration tests need DATABASE_URL (see api/.env.example)');
-
-const { app, pool } = buildApp({ DATABASE_URL: databaseUrl });
+const { app, pool } = buildApp({ DATABASE_URL: inject('appDatabaseUrl') });
 afterAll(() => pool.end());
 
 describe('GET /api/health against Postgres', () => {
@@ -15,11 +12,12 @@ describe('GET /api/health against Postgres', () => {
     expect(res.body).toEqual({ status: 'ok', db: 'ok' });
   });
 
-  it('runs on Postgres 18 with the baseline migration applied', async () => {
-    const { rows } = await pool.query<{ version: number; citext: boolean }>(
+  it('runs on Postgres 18 with citext installed, connected as a non-owner role', async () => {
+    const { rows } = await pool.query<{ version: number; citext: boolean; superuser: boolean }>(
       `select current_setting('server_version_num')::int / 10000 as version,
-              exists (select 1 from pg_extension where extname = 'citext') as citext`,
+              exists (select 1 from pg_extension where extname = 'citext') as citext,
+              (select rolsuper from pg_roles where rolname = current_user) as superuser`,
     );
-    expect(rows[0]).toEqual({ version: 18, citext: true });
+    expect(rows[0]).toEqual({ version: 18, citext: true, superuser: false });
   });
 });

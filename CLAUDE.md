@@ -21,11 +21,12 @@ The audit and the full design rationale (domain model, rounding rule, debt simpl
 ```sh
 npm ci                           # root; npm workspaces: api, web. Installs exactly what package-lock.json says
 docker compose up -d db          # Postgres 18 on localhost:5434 (project "hisaab")
-npm run db:migrate               # dbmate up (uses DATABASE_URL, see api/.env.example)
+npm run db:migrate               # dbmate up as the owner role (MIGRATE_DATABASE_URL, see api/.env.example)
+npm run db:bootstrap             # dev: create the API's login role (DATABASE_URL creds) as a member of hisaab_app
 npm run dev:api                  # API on :8081
 npm run dev:web                  # web on :5174
 npm run typecheck && npm run lint && npm test
-npm run test:int                 # API integration tests; needs Postgres + DATABASE_URL
+npm run test:int                 # API integration tests: creates, migrates and drops a throwaway DB (needs MIGRATE_DATABASE_URL)
 ```
 
 ## Phases

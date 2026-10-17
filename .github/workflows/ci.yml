@@ -31,7 +31,8 @@ jobs:
           --health-cmd "pg_isready -U hisaab -d hisaab"
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
-      DATABASE_URL: postgres://hisaab:hisaab_ci@127.0.0.1:5432/hisaab?sslmode=disable
+      # Owner role; integration tests create, migrate and drop their own database with it.
+      MIGRATE_DATABASE_URL: postgres://hisaab:hisaab_ci@127.0.0.1:5432/hisaab?sslmode=disable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -43,8 +44,6 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Audit dependencies
         run: npm audit --audit-level=high
-      - name: Migrate
-        run: npx dbmate --no-dump-schema --wait up
       - run: npm run typecheck
       - run: npm run lint
       - name: Unit tests

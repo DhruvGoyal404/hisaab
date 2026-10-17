@@ -17,8 +17,9 @@
     "test": "npm test -w api && npm test -w web",
     "test:int": "npm run test:int -w api",
     "db:up": "docker compose up -d --wait db",
-    "db:migrate": "dbmate --env-file api/.env --no-dump-schema --wait up",
-    "db:rollback": "dbmate --env-file api/.env --no-dump-schema rollback",
+    "db:migrate": "dbmate --env-file api/.env -e MIGRATE_DATABASE_URL --no-dump-schema --wait up",
+    "db:rollback": "dbmate --env-file api/.env -e MIGRATE_DATABASE_URL --no-dump-schema rollback",
+    "db:bootstrap": "tsx --env-file=api/.env api/scripts/db-bootstrap.ts",
     "db:new": "dbmate new"
   },
   "devDependencies": {

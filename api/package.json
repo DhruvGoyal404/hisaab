@@ -8,7 +8,7 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --exclude \"**/*.int.test.ts\"",
-    "test:int": "vitest run int.test"
+    "test:int": "vitest run --config vitest.int.config.ts"
   },
   "dependencies": {
     "cookie": "2.0.1",

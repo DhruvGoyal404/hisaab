@@ -13,6 +13,7 @@ npm ci
 docker compose up -d db
 cp api/.env.example api/.env
 npm run db:migrate
+npm run db:bootstrap
 npm run dev:api    # http://localhost:8081/api/health
 npm run dev:web    # http://localhost:5174
 ```
