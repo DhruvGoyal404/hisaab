@@ -36,6 +36,18 @@ describe('error handling', () => {
     const res = await request(app).get('/api/nope');
     expect(res.headers['x-powered-by']).toBeUndefined();
   });
+
+  it('sends helmet’s security headers on every response, errors included', async () => {
+    for (const res of [await request(app).get('/api/nope'), await request(app).post('/api/groups').send({})]) {
+      expect(res.headers['content-security-policy']).toBe("default-src 'none';frame-ancestors 'none'");
+      expect(res.headers['x-content-type-options']).toBe('nosniff');
+      expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
+      expect(res.headers['referrer-policy']).toBe('no-referrer');
+      expect(res.headers['strict-transport-security']).toMatch(/max-age=\d+/);
+      expect(res.headers['cross-origin-opener-policy']).toBe('same-origin');
+      expect(res.headers['cross-origin-resource-policy']).toBe('same-origin');
+    }
+  });
 });
 
 describe('origin check', () => {

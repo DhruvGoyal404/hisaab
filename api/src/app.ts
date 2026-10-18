@@ -1,4 +1,5 @@
 import express, { type Express } from 'express';
+import helmet from 'helmet';
 import type pg from 'pg';
 import { pinoHttp } from 'pino-http';
 import type { Logger } from 'pino';
@@ -16,6 +17,9 @@ export type AppDeps = { config: Config; logger: Logger; pool: pg.Pool; rateLimit
 export function createApp({ config, logger, pool, rateLimits = createRateLimits(pool, logger) }: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
+  // helmet's defaults (nosniff, frame and referrer policies, HSTS, COOP/CORP, ...). The API only
+  // ever answers with JSON, so its own CSP can forbid everything; the page CSP comes with deploy.
+  app.use(helmet({ contentSecurityPolicy: { useDefaults: false, directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } } }));
 
   app.use(pinoHttp({ logger }));
   app.use(requireAllowedOrigin(config.webOrigins));

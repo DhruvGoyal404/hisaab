@@ -16,6 +16,12 @@ describe('dev login guard', () => {
     expect(loadConfig({ ...baseEnv, NODE_ENV: 'test', DEV_LOGIN: 'true' }).devLogin).toBe(true);
   });
 
+  it('there is no other environment to enable it in: NODE_ENV must be development, test or production', () => {
+    for (const NODE_ENV of ['staging', 'prod', '', undefined]) {
+      expect(() => loadConfig({ ...baseEnv, NODE_ENV, DEV_LOGIN: 'true' })).toThrow(ConfigError);
+    }
+  });
+
   it('the router itself refuses to be built in production', () => {
     const { pool } = buildApp();
     expect(() => devLoginRouter('production', pool)).toThrow(/dev login refused/);
