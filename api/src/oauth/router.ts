@@ -5,7 +5,7 @@ import type { Logger } from 'pino';
 import { requireSession, sessionOf } from '../auth.js';
 import type { Config } from '../config.js';
 import { notFound } from '../repo/tx.js';
-import { findSession, sessionToken, startSession } from '../sessions.js';
+import { findSession, revokeAllSessions, revokeSession, SESSION_COOKIE, sessionToken, startSession } from '../sessions.js';
 import { identitiesOf, linkIdentity, signInWith } from './accounts.js';
 import { consumeFlow, isProvider, OAuthError, safeReturnTo, startFlow, type Flow, type Provider } from './flows.js';
 import { githubAuthorizeUrl, githubProfile } from './github.js';
@@ -111,6 +111,19 @@ export function oauthRouter(pool: pg.Pool, config: Config, logger: Logger): Rout
     const provider = String(req.params.provider);
     if (!configured(provider)) throw notFound();
     await begin(res, provider, 'link', '/account', sessionOf(res).userId);
+  });
+
+  // Sign out this browser.
+  router.post('/auth/logout', async (req, res) => {
+    const token = sessionToken(req);
+    if (token) await revokeSession(pool, token);
+    res.clearCookie(SESSION_COOKIE, { path: '/', secure }).status(204).end();
+  });
+
+  // Sign out on every device: revokes all of the user's sessions and so disconnects their sockets.
+  router.post('/auth/logout-all', requireSession(pool), async (_req, res) => {
+    const revoked = await revokeAllSessions(pool, sessionOf(res).userId);
+    res.clearCookie(SESSION_COOKIE, { path: '/', secure }).json({ revoked });
   });
 
   router.get('/auth/identities', requireSession(pool), async (_req, res) => {

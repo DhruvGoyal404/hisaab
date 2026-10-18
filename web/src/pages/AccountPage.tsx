@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router';
-import { AppShell, btn, dateLabel, ErrorNote, LedgerSection, Loading } from '../components/ui';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router';
+import { AppShell, btn, Button, dateLabel, ErrorNote, LedgerSection, Loading } from '../components/ui';
 import { api } from '../lib/api';
 import { useMe } from '../lib/auth';
 import { signInError } from './SignInPage';
@@ -28,6 +28,14 @@ export function AccountPage() {
   const identities = useQuery({ queryKey: ['identities'], queryFn: api.identities });
   const providers = useQuery({ queryKey: ['providers'], queryFn: api.providers, staleTime: Infinity });
   const message = linkMessage(params);
+  const qc = useQueryClient();
+  const navigate = useNavigate();
+  const leave = async () => {
+    qc.clear();
+    await navigate('/signin', { replace: true });
+  };
+  const signOut = useMutation({ mutationFn: api.logout, onSuccess: leave });
+  const signOutEverywhere = useMutation({ mutationFn: api.logoutAll, onSuccess: leave });
   const linked = new Set(identities.data?.identities.map((i) => i.provider));
   const linkable = (['google', 'github'] as const).filter((p) => providers.data?.[p] && !linked.has(p));
 
@@ -65,6 +73,15 @@ export function AccountPage() {
           <p className="mt-3 text-sm text-muted">
             Linking lets you sign in with either. Accounts are never joined just because the email addresses match.
           </p>
+        </LedgerSection>
+
+        <LedgerSection title="Sessions">
+          <p className="mb-3 text-muted">Signed in on another phone or laptop you no longer use? Sign out everywhere ends every session, including this one.</p>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="secondary" onClick={() => { signOut.mutate(); }} disabled={signOut.isPending}>Sign out</Button>
+            <Button variant="secondary" onClick={() => { signOutEverywhere.mutate(); }} disabled={signOutEverywhere.isPending}>Sign out everywhere</Button>
+          </div>
+          <ErrorNote error={signOut.error ?? signOutEverywhere.error} />
         </LedgerSection>
       </div>
     </AppShell>

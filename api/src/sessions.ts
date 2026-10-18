@@ -50,8 +50,23 @@ export async function revokeSession(pool: pg.Pool, token: string): Promise<void>
 
 export const sessionToken = (req: Request): string | undefined => parseCookie(req.get('cookie') ?? '')[SESSION_COOKIE];
 
-/** Issues a session for `userId` and sets its cookie (Secure outside development and test). */
+/**
+ * Revokes every live session of a user ("sign out everywhere"). Each revoked row fires the
+ * hisaab_session notification, so the sockets of all those sessions are disconnected.
+ */
+export async function revokeAllSessions(pool: pg.Pool, userId: string): Promise<number> {
+  const { rowCount } = await pool.query('update sessions set revoked_at = now() where user_id = $1 and revoked_at is null', [userId]);
+  return rowCount ?? 0;
+}
+
+/**
+ * Issues a session for `userId` and sets its cookie (Secure in production). Rotation: any session
+ * the browser came with is revoked first, so a token planted before sign-in (session fixation)
+ * or left from another account never survives a sign-in.
+ */
 export async function startSession(pool: pg.Pool, req: Request, res: Response, userId: string, secure: boolean): Promise<void> {
+  const previous = sessionToken(req);
+  if (previous) await revokeSession(pool, previous);
   const { token, expiresAt } = await createSession(pool, userId, req.get('user-agent'));
   res.cookie(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure, path: '/', expires: expiresAt });
 }

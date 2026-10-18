@@ -1,15 +1,12 @@
 import { createHash } from 'node:crypto';
-import { parseCookie } from 'cookie';
-import { Router, type Request } from 'express';
+import { Router } from 'express';
 import type pg from 'pg';
 import { z } from 'zod';
 import { devLoginAllowed } from './config.js';
 import { HttpError } from './errors.js';
-import { createSession, findSession, revokeSession, SESSION_COOKIE } from './sessions.js';
+import { findSession, revokeSession, SESSION_COOKIE, sessionToken, startSession } from './sessions.js';
 
 const loginBody = z.object({ name: z.string().trim().min(1).max(60) });
-
-const sessionToken = (req: Request): string | undefined => parseCookie(req.get('cookie') ?? '')[SESSION_COOKIE];
 
 /** The same name always maps to the same dev user, keyed by a reserved .invalid email. */
 async function findOrCreateDevUser(pool: pg.Pool, name: string): Promise<string> {
@@ -38,8 +35,7 @@ export function devLoginRouter(nodeEnv: string, pool: pg.Pool): Router {
   router.post('/dev/login', async (req, res) => {
     const { name } = loginBody.parse(req.body);
     const userId = await findOrCreateDevUser(pool, name);
-    const { token, expiresAt } = await createSession(pool, userId, req.get('user-agent'));
-    res.cookie(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', path: '/', expires: expiresAt });
+    await startSession(pool, req, res, userId, false); // dev and test only: never served over HTTPS here
     res.status(201).json({ user: { id: userId, name } });
   });
 
