@@ -23,13 +23,15 @@ const total = fc.oneof(
 );
 
 /** n positive integers summing to `sum` (n ≤ sum), as cut points of [1, sum - 1]. */
-const partition = (n: number, sum: number) =>
-  fc
-    .uniqueArray(fc.integer({ min: 1, max: sum - 1 }), { minLength: n - 1, maxLength: n - 1 })
-    .map((cuts) => {
-      const points = [0, ...cuts.sort((a, b) => a - b), sum];
-      return points.slice(1).map((p, i) => p - (points[i] ?? 0));
-    });
+const partition = (n: number, sum: number): fc.Arbitrary<number[]> =>
+  n === 1
+    ? fc.constant([sum]) // no cut points; also avoids fc.integer({ min: 1, max: 0 }) when sum is 1
+    : fc
+        .uniqueArray(fc.integer({ min: 1, max: sum - 1 }), { minLength: n - 1, maxLength: n - 1 })
+        .map((cuts) => {
+          const points = [0, ...cuts.sort((a, b) => a - b), sum];
+          return points.slice(1).map((p, i) => p - (points[i] ?? 0));
+        });
 
 type Case = { method: SplitMethod; total: number; weights: WeightInput[]; seed: string };
 
