@@ -45,24 +45,49 @@ export async function startStack(rateLimit?: { burst: number; perSecond: number 
     return { cookie, userId: (res.body as { user: { id: string } }).user.id };
   }
 
+  // Listen for 'ready' from the moment a socket exists: a caller that awaits something else before
+  // calling ready() must not miss the event.
+  const readyOf = new WeakMap<TestSocket, Promise<string[]>>();
+
+  function awaitReady(s: TestSocket): Promise<string[]> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`no ready within 15 s (connected=${s.connected})`));
+      }, 15_000);
+      s.once('ready', ({ groups }) => {
+        clearTimeout(timer);
+        resolve(groups);
+      });
+      s.once('connect_error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+      s.once('disconnect', (reason) => {
+        clearTimeout(timer);
+        reject(new Error(`disconnected before ready: ${reason}`));
+      });
+    });
+  }
+
   /** A real socket.io-client over WebSocket with the given headers; not auto-reconnecting. */
   function socket(headers: { cookie?: string; origin?: string | null }): TestSocket {
     const extraHeaders: Record<string, string> = {};
     if (headers.cookie) extraHeaders.Cookie = headers.cookie;
     if (headers.origin !== null) extraHeaders.Origin = headers.origin ?? WEB_ORIGIN;
     const s: TestSocket = ioClient(url, { path: SOCKET_PATH, transports: ['websocket'], extraHeaders, reconnection: false, forceNew: true });
+    const r = awaitReady(s);
+    r.catch(() => undefined); // tests that expect a rejection observe it via ready() or their own handlers
+    readyOf.set(s, r);
     sockets.push(s);
     return s;
   }
 
-  /** Resolves with the groups the server put the socket in, or rejects with the connect error. */
+  /**
+   * Resolves with the groups the server put the socket in. Rejects (never hangs) on a connect
+   * error, on a disconnect before ready, or after 15 s, naming the reason.
+   */
   function ready(s: TestSocket): Promise<string[]> {
-    return new Promise((resolve, reject) => {
-      s.once('ready', ({ groups }) => {
-        resolve(groups);
-      });
-      s.once('connect_error', reject);
-    });
+    return readyOf.get(s) ?? awaitReady(s);
   }
 
   return {

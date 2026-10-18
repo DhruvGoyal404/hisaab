@@ -19,8 +19,9 @@ describe('socket server', () => {
 
     const got = recorder(s);
     await createExpense(stack.pool, { groupId, userId: asha.userId, expense: expense(500, memberId, [memberId]) });
-    await until(() => got.length === 1);
-    expect(got).toEqual([{ groupId, seq: 2 }]);
+    // The group.created signal (seq 1) may still arrive late; clients ignore seq <= lastSeen.
+    await until(() => got.some((s) => s.seq === 2));
+    expect(got.filter((s) => s.seq >= 2)).toEqual([{ groupId, seq: 2 }]);
   });
 
   it('answers sync with the groups the client is behind on', async () => {

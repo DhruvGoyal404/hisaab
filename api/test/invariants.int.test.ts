@@ -95,6 +95,20 @@ describe('splits must sum to the total (deferred check at COMMIT)', () => {
   });
 });
 
+/**
+ * TRUNCATE ... CASCADE needs ACCESS EXCLUSIVE locks on the table and everything referencing it, in
+ * a database other test files are writing to concurrently, so it can lose a deadlock (40P01)
+ * before the trigger gets to answer. Retry those transient lock failures; the assertion is still
+ * that the trigger itself rejects it.
+ */
+async function ownerTruncateState(table: string): Promise<string> {
+  for (let attempt = 0; ; attempt++) {
+    const state = await sqlState(owner.query(`truncate ${table} cascade`));
+    if ((state !== '40P01' && state !== '55P03') || attempt === 9) return state;
+    await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
+  }
+}
+
 const APPEND_ONLY = ['activity_log', 'expenses', 'expense_versions', 'expense_lines', 'settlements', 'settlement_voids', 'ledger_entries'];
 
 describe('append-only tables', () => {
@@ -128,7 +142,7 @@ describe('append-only tables', () => {
     const [col, value] = table === 'expenses' ? ['created_at', 'now()'] : table === 'activity_log' ? ['type', "'x.y'"] : ['group_id', 'group_id'];
     expect(await sqlState(owner.query(`update ${table} set ${col} = ${value} where group_id = $1`, [groupId]))).toBe('ZA001');
     expect(await sqlState(owner.query(`delete from ${table} where group_id = $1`, [groupId]))).toBe('ZA001');
-    expect(await sqlState(owner.query(`truncate ${table} cascade`))).toBe('ZA001');
+    expect(await ownerTruncateState(table)).toBe('ZA001');
   });
 });
 
