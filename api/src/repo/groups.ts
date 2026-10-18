@@ -191,3 +191,14 @@ export async function leaveGroup(pool: pg.Pool, input: { groupId: string; userId
   });
 }
 
+
+/** Group setting: simplify debts (default on). When off, the settle plan defaults to the raw view. */
+export async function setSimplifyDebts(
+  pool: pg.Pool,
+  input: { groupId: string; userId: string; simplifyDebts: boolean },
+): Promise<void> {
+  return withGroupWrite(pool, input.groupId, input.userId, async (tx) => {
+    await tx.client.query('update groups set simplify_debts = $2 where id = $1', [tx.groupId, input.simplifyDebts]);
+    await logActivity(tx, input.userId, 'group.settings_changed', tx.groupId, { simplifyDebts: input.simplifyDebts });
+  });
+}
