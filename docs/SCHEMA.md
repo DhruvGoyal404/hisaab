@@ -208,7 +208,13 @@ It runs in the same transaction as the group lock and the membership change. If 
 
 ## 10. Users, identities, sessions, roles
 
-**`users`:** display name, optional primary `email` (citext, unique when present), optional avatar, and `disabled_at`.
+**`users`:** display name, optional primary `email` (citext, unique when present), optional avatar, `disabled_at` and `deleted_at`.
+
+**Account deletion (Phase 6, migration `…000007`):**
+- Users are never deleted, because the ledger, the activity log and groups point at them. A deleted account is anonymised ("Deleted user", no email or avatar) and marked `deleted_at`, which a check ties to that anonymity.
+- In each group the membership drops its `user_id` and becomes a placeholder named "Deleted user" (numbered on a clash). It keeps the same member id, so every balance stays exactly where it was. An owner's role passes to an admin, else the longest-standing real member. One `member.deleted_account` activity row is written per group.
+- Sessions are revoked (disconnecting sockets) and removed. Identities, unfinished sign-in flows and idempotency keys are removed too.
+- `memberships_guard` allows a membership to lose its user only when that user is deleted.
 
 **`oauth_identities`:**
 - `(provider, subject)` is unique, where subject is Google's `sub` or GitHub's numeric id, never an email.
@@ -220,7 +226,9 @@ It runs in the same transaction as the group lock and the membership change. If 
 - `token_hash bytea` is the sha256 of a 256-bit random token. That's enough entropy that no salt is needed.
 - Columns `expires_at`, `revoked_at`, `last_seen_at` and a short `user_agent`.
 - Lookup is `token_hash = $1 and revoked_at is null and expires_at > now()`. "Log out everywhere" sets `revoked_at` on all of a user's sessions.
-- The OAuth `state`/PKCE verifier/nonce live in a short-lived signed cookie (Phase 6), not in the database.
+- **Sign-in flows (`oauth_flows`, Phase 6):** each flow stores the hash of its `state`, the PKCE verifier, the nonce, its purpose (login or link), the user who is linking and where to return. A flow lives 10 minutes and is consumed once (`DELETE … RETURNING`), so a replayed state fails. An HttpOnly cookie on `/api/auth` binds the flow to the browser that started it.
+
+**`rate_limits` (Phase 6):** rate-limiter-flexible's own table (`key`, `points`, `expire`), created by a migration so the app role never needs CREATE. Keys are `<limiter>:<ip or user id>`.
 
 **Membership roles:**
 - `owner`: exactly one active per group, enforced by a partial unique index.
