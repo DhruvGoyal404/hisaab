@@ -122,3 +122,36 @@ export async function selectActivityPage(
   const items = rows.slice(0, limit);
   return { items, nextBefore: rows.length > limit ? (items.at(-1)?.seq ?? null) : null };
 }
+
+export const MAX_CATCHUP_PAGE = 200;
+
+/**
+ * Catch-up for real-time clients: activity rows with seq > afterSeq, oldest first, plus the
+ * group's last_seq read in the same snapshot, so the client knows when it has caught up.
+ */
+export function activityAfter(
+  pool: pg.Pool,
+  input: { groupId: string; userId: string; afterSeq: number; limit?: number },
+): Promise<{ items: ActivityItem[]; lastSeq: number; hasMore: boolean }> {
+  const limit = input.limit ?? MAX_CATCHUP_PAGE;
+  if (!Number.isInteger(limit) || limit < 1 || limit > MAX_CATCHUP_PAGE) {
+    return Promise.reject(new HttpError(422, 'invalid_limit', `limit must be 1-${MAX_CATCHUP_PAGE}`));
+  }
+  if (!Number.isSafeInteger(input.afterSeq) || input.afterSeq < 0) {
+    return Promise.reject(new HttpError(422, 'invalid_cursor', 'afterSeq must be a non-negative integer'));
+  }
+  return withGroupRead(pool, input.groupId, input.userId, async (client) => {
+    const { rows: g } = await client.query<{ last_seq: number }>('select last_seq from groups where id = $1', [input.groupId]);
+    const { rows } = await client.query<ActivityItem>(
+      `select a.seq, a.id, a.type, a.subject_id as "subjectId", a.payload, a.created_at as "createdAt",
+              u.display_name as "actorName"
+         from activity_log a
+         left join users u on u.id = a.actor_user_id
+        where a.group_id = $1 and a.seq > $2
+        order by a.seq
+        limit $3`,
+      [input.groupId, input.afterSeq, limit + 1],
+    );
+    return { items: rows.slice(0, limit), lastSeq: g[0]?.last_seq ?? 0, hasMore: rows.length > limit };
+  });
+}
