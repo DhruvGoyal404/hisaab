@@ -8,6 +8,7 @@ import { RequireAuth } from './lib/auth';
 import { GroupPage } from './pages/group/GroupPage';
 import { HomePage } from './pages/HomePage';
 import { SignInPage } from './pages/SignInPage';
+import { RealtimeProvider } from './realtime/RealtimeProvider';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,7 +45,9 @@ if (!root) throw new Error('#root missing from index.html');
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <RealtimeProvider>
+        <RouterProvider router={router} />
+      </RealtimeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

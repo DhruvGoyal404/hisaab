@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router';
 import { AppShell, balanceText, btn, ErrorNote, Loading } from '../../components/ui';
 import { useBalances, useGroup } from '../../lib/groupQueries';
+import { useRealtime } from '../../realtime/RealtimeProvider';
 import { ActivitySection } from './ActivitySection';
 import { BalancesSection } from './BalancesSection';
 import { MembersSection } from './MembersSection';
@@ -21,6 +23,11 @@ export function GroupPage() {
   const group = useGroup(groupId);
   const balances = useBalances(groupId);
   const mine = balances.data?.members.find((m) => m.memberId === group.data?.me.memberId);
+  const realtime = useRealtime();
+  const lastSeq = group.data?.lastSeq;
+  useEffect(() => {
+    if (lastSeq !== undefined) realtime?.track(groupId, lastSeq);
+  }, [realtime, groupId, lastSeq]);
   const show = (t: Tab) => (tab === t ? '' : 'hidden lg:block');
 
   const addExpense = `/groups/${groupId}/expenses/new`;

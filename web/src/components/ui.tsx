@@ -2,6 +2,7 @@ import { formatPaise } from '@hisaab/money';
 import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ApiError } from '../lib/api';
+import { ConnectionStatus } from '../realtime/ConnectionStatus';
 
 export const btn = {
   primary:
@@ -124,7 +125,7 @@ export function AppShell({
             </Link>
           ) : null}
           <div className="min-w-0 flex-1">{title}</div>
-          {status}
+          {status ?? <ConnectionStatus />}
           {actions}
         </div>
       </header>
