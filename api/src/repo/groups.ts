@@ -202,3 +202,38 @@ export async function setSimplifyDebts(
     await logActivity(tx, input.userId, 'group.settings_changed', tx.groupId, { simplifyDebts: input.simplifyDebts });
   });
 }
+
+export type InvitePreview = {
+  groupId: string;
+  groupName: string;
+  invitedBy: string;
+  /** Set when the link claims a placeholder member. */
+  ghostName: string | null;
+  usable: boolean;
+  alreadyMember: boolean;
+};
+
+/** What an invite link offers, for the claim page. Unknown tokens are 410 like used ones. */
+export async function previewInvite(pool: pg.Pool, input: { token: string; userId: string }): Promise<InvitePreview> {
+  const { rows } = await pool.query<{
+    group_id: string; group_name: string; invited_by: string; ghost_name: string | null; usable: boolean; already_member: boolean;
+  }>(
+    `select i.group_id, g.name as group_name, u.display_name as invited_by,
+            case when gm.user_id is null and gm.status = 'active' then gm.display_name end as ghost_name,
+            (i.used_at is null and i.revoked_at is null and i.expires_at > now()
+              and (i.ghost_member_id is null or (gm.user_id is null and gm.status = 'active'))) as usable,
+            exists (select 1 from memberships me where me.group_id = i.group_id and me.user_id = $2 and me.status = 'active') as already_member
+       from invites i
+       join groups g on g.id = i.group_id
+       join users u on u.id = i.created_by
+       left join memberships gm on gm.id = i.ghost_member_id
+      where i.token_hash = $1`,
+    [hashToken(input.token), input.userId],
+  );
+  const r = rows[0];
+  if (!r) throw inviteGone();
+  return {
+    groupId: r.group_id, groupName: r.group_name, invitedBy: r.invited_by, ghostName: r.ghost_name,
+    usable: r.usable, alreadyMember: r.already_member,
+  };
+}

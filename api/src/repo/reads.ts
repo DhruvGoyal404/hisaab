@@ -155,3 +155,43 @@ export function activityAfter(
     return { items: rows.slice(0, limit), lastSeq: g[0]?.last_seq ?? 0, hasMore: rows.length > limit };
   });
 }
+
+export type GroupMember = { memberId: string; name: string; isGhost: boolean; role: 'owner' | 'admin' | 'member'; isMe: boolean };
+export type GroupDetail = {
+  groupId: string;
+  name: string;
+  currency: string;
+  simplifyDebts: boolean;
+  lastSeq: number;
+  me: { memberId: string; role: 'owner' | 'admin' | 'member' };
+  members: GroupMember[];
+};
+
+/** The group header, settings and active members (merged ghosts are folded away), in one snapshot. */
+export function groupDetail(pool: pg.Pool, input: { groupId: string; userId: string }): Promise<GroupDetail> {
+  return withGroupRead(pool, input.groupId, input.userId, async (client, me) => {
+    const { rows: g } = await client.query<{ name: string; currency: string; simplify_debts: boolean; last_seq: number }>(
+      'select name, currency, simplify_debts, last_seq from groups where id = $1',
+      [input.groupId],
+    );
+    const group = g[0];
+    if (!group) throw new Error('group vanished inside its own snapshot');
+    const { rows: members } = await client.query<GroupMember>(
+      `select m.id as "memberId", coalesce(u.display_name, m.display_name) as name,
+              m.user_id is null as "isGhost", m.role, m.id = $2 as "isMe"
+         from memberships m left join users u on u.id = m.user_id
+        where m.group_id = $1 and m.status = 'active'
+        order by m.user_id is null, lower(coalesce(u.display_name, m.display_name)), m.id`,
+      [input.groupId, me.id],
+    );
+    return {
+      groupId: input.groupId,
+      name: group.name,
+      currency: group.currency.trim(),
+      simplifyDebts: group.simplify_debts,
+      lastSeq: group.last_seq,
+      me: { memberId: me.id, role: me.role },
+      members,
+    };
+  });
+}

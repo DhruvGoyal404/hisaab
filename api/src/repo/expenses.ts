@@ -220,7 +220,9 @@ export async function editExpense(
     const lines = buildLines(input.expenseId, input.expense);
     await assertMembersUsable(tx, lines);
     const version = h.version + 1;
-    await logActivity(tx, input.userId, 'expense.edited', input.expenseId, { fromVersion: h.version, toVersion: version });
+    await logActivity(tx, input.userId, 'expense.edited', input.expenseId, {
+      fromVersion: h.version, toVersion: version, description: input.expense.description.trim(), totalMinor: input.expense.totalMinor,
+    });
     await insertVersion(tx, input.userId, input.expenseId, version, 'edit', input.expense, lines);
     return { version };
   });
@@ -235,7 +237,9 @@ export async function deleteExpense(
     const h = await lockedHead(tx, input.expenseId, input.expectedVersion);
     if (h.kind === 'delete') throw new HttpError(409, 'already_deleted', 'The expense is already deleted');
     const version = h.version + 1;
-    await logActivity(tx, input.userId, 'expense.deleted', input.expenseId, { fromVersion: h.version, toVersion: version });
+    await logActivity(tx, input.userId, 'expense.deleted', input.expenseId, {
+      fromVersion: h.version, toVersion: version, description: h.description, totalMinor: h.total_minor,
+    });
     await insertVersion(tx, input.userId, input.expenseId, version, 'delete', null, []);
     return { version };
   });
@@ -268,6 +272,7 @@ export async function restoreExpense(
     const version = h.version + 1;
     await logActivity(tx, input.userId, 'expense.restored', input.expenseId, {
       fromVersion: h.version, toVersion: version, restoredFromVersion: live.version,
+      description: expense.description, totalMinor: expense.totalMinor,
     });
     await insertVersion(tx, input.userId, input.expenseId, version, 'edit', expense, lines);
     return { version };
