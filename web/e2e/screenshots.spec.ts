@@ -1,6 +1,6 @@
 // Captures the main screens for docs/img: every screen at 390 px and desktop in light, plus home and
-// group in dark. Run on purpose, against a fresh database so the accounts look new:
-//   SCREENSHOTS=1 npx playwright test screenshots   (SCREENSHOT_DIR overrides the output folder)
+// group in dark. Run on purpose: npm run screenshots -w web (a throwaway database, so accounts look new;
+// SCREENSHOT_DIR overrides the output folder).
 import { fileURLToPath } from 'node:url';
 import { test, type APIRequestContext, type Page } from '@playwright/test';
 import { apiFor, contextOptions, ORIGIN, seedTrip, signedIn } from './support';

@@ -73,7 +73,6 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       MIGRATE_DATABASE_URL: postgres://hisaab:hisaab_ci@127.0.0.1:5432/hisaab?sslmode=disable
-      E2E_DATABASE_URL: postgres://hisaab_api:hisaab_api_ci@127.0.0.1:5432/hisaab?sslmode=disable
     defaults:
       run:
         shell: bash # -eo pipefail
@@ -86,10 +85,6 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - name: Prepare database
-        run: |
-          npx dbmate -e MIGRATE_DATABASE_URL --no-dump-schema --wait up
-          NODE_ENV=test DATABASE_URL="$E2E_DATABASE_URL" npx tsx api/scripts/db-bootstrap.ts
       - name: Build web and check the bundle budget
         run: |
           npm run build -w web
@@ -97,5 +92,5 @@ jobs:
       - name: Install Chromium
         working-directory: web
         run: PLAYWRIGHT_BROWSERS_PATH="$PWD/.playwright" npx playwright install --with-deps chromium
-      - name: End-to-end tests
+      - name: End-to-end tests (own throwaway database)
         run: npm run e2e -w web

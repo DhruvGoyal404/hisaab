@@ -8,8 +8,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p e2e",
     "test": "vitest run",
-    "e2e": "playwright test",
-    "size": "node scripts/bundle-size.js"
+    "e2e": "tsx e2e/run.ts",
+    "size": "node scripts/bundle-size.js",
+    "screenshots": "tsx e2e/run.ts --screenshots"
   },
   "dependencies": {
     "@fontsource/hind": "5.3.0",

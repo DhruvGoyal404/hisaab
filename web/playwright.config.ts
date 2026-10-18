@@ -19,14 +19,16 @@ export default defineConfig({
   reporter: [['list']],
   use: { baseURL: BASE_URL, trace: 'retain-on-failure', locale: 'en-IN', timezoneId: 'Asia/Kolkata' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  // Locally, running dev servers (npm run dev:api / dev:web) are reused. In CI both are started here:
-  // the API against E2E_DATABASE_URL with dev login on, and the built web app via vite preview.
+  // Started fresh for every run by e2e/run.ts (npm run e2e), which creates a throwaway database and
+  // passes E2E_DATABASE_URL: the API runs against it with dev login on; the web app is the Vite dev
+  // server locally and the built app (vite preview) in CI. Dev servers are never reused, so a run
+  // can't touch the dev database (stop them first if they hold ports 8081/5174).
   webServer: [
     {
       command: 'node --import tsx src/server.ts',
       cwd: '../api',
       url: 'http://127.0.0.1:8081/api/health',
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: false,
       timeout: 60_000,
       env: {
         NODE_ENV: 'test',
@@ -35,9 +37,9 @@ export default defineConfig({
         PORT: '8081',
         WEB_ORIGINS: BASE_URL,
         LOG_LEVEL: 'warn',
-        DATABASE_URL: process.env.E2E_DATABASE_URL ?? '',
+        DATABASE_URL: process.env.E2E_DATABASE_URL ?? 'postgres://run-e2e-via-npm-run-e2e@127.0.0.1:1/none',
       },
     },
-    { command: 'npx vite preview', url: BASE_URL, reuseExistingServer: !process.env.CI, timeout: 60_000 },
+    { command: process.env.CI ? 'npx vite preview' : 'npx vite', url: BASE_URL, reuseExistingServer: false, timeout: 60_000 },
   ],
 });
