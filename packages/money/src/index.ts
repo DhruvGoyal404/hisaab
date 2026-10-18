@@ -9,3 +9,4 @@ export {
   type SplitMethod,
   type WeightInput,
 } from './allocate.js';
+export { formatPaise, paiseToDecimal, parseRupees, type ParseResult } from './money.js';
