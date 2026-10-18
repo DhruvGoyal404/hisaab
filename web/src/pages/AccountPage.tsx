@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { AppShell, btn, Button, dateLabel, ErrorNote, LedgerSection, Loading } from '../components/ui';
 import { api } from '../lib/api';
@@ -36,6 +37,8 @@ export function AccountPage() {
   };
   const signOut = useMutation({ mutationFn: api.logout, onSuccess: leave });
   const signOutEverywhere = useMutation({ mutationFn: api.logoutAll, onSuccess: leave });
+  const deleteAccount = useMutation({ mutationFn: api.deleteAccount, onSuccess: leave });
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const linked = new Set(identities.data?.identities.map((i) => i.provider));
   const linkable = (['google', 'github'] as const).filter((p) => providers.data?.[p] && !linked.has(p));
 
@@ -82,6 +85,25 @@ export function AccountPage() {
             <Button variant="secondary" onClick={() => { signOutEverywhere.mutate(); }} disabled={signOutEverywhere.isPending}>Sign out everywhere</Button>
           </div>
           <ErrorNote error={signOut.error ?? signOutEverywhere.error} />
+        </LedgerSection>
+
+        <LedgerSection title="Delete account">
+          <p className="mb-3 text-muted">
+            Your groups keep every expense and balance. Where you were a member you become “Deleted user”, so what you owe
+            or are owed stays on the books. Your sign-ins and sessions are removed, and this can’t be undone.
+          </p>
+          {confirmingDelete ? (
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant="secondary" className="border-owe text-owe"
+                onClick={() => { deleteAccount.mutate(); }} disabled={deleteAccount.isPending}
+              >Delete my account</Button>
+              <Button variant="quiet" onClick={() => { setConfirmingDelete(false); }}>Keep my account</Button>
+            </div>
+          ) : (
+            <Button variant="secondary" onClick={() => { setConfirmingDelete(true); }}>Delete account…</Button>
+          )}
+          <ErrorNote error={deleteAccount.error} />
         </LedgerSection>
       </div>
     </AppShell>

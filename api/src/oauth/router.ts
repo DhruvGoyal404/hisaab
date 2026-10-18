@@ -2,8 +2,10 @@ import { parseCookie } from 'cookie';
 import { Router, type Response } from 'express';
 import type pg from 'pg';
 import type { Logger } from 'pino';
+import { z } from 'zod';
 import { requireSession, sessionOf } from '../auth.js';
 import type { Config } from '../config.js';
+import { deleteAccount } from '../repo/account.js';
 import { notFound } from '../repo/tx.js';
 import { findSession, revokeAllSessions, revokeSession, SESSION_COOKIE, sessionToken, startSession } from '../sessions.js';
 import { identitiesOf, linkIdentity, signInWith } from './accounts.js';
@@ -124,6 +126,13 @@ export function oauthRouter(pool: pg.Pool, config: Config, logger: Logger): Rout
   router.post('/auth/logout-all', requireSession(pool), async (_req, res) => {
     const revoked = await revokeAllSessions(pool, sessionOf(res).userId);
     res.clearCookie(SESSION_COOKIE, { path: '/', secure }).json({ revoked });
+  });
+
+  // Account deletion: placeholders keep every balance; sign-ins and sessions go (repo/account.ts).
+  router.delete('/me', requireSession(pool), async (req, res) => {
+    z.object({ confirm: z.literal(true) }).parse(req.body);
+    const { groups } = await deleteAccount(pool, sessionOf(res).userId);
+    res.clearCookie(SESSION_COOKIE, { path: '/', secure }).json({ deleted: true, groups });
   });
 
   router.get('/auth/identities', requireSession(pool), async (_req, res) => {

@@ -14,6 +14,7 @@ export const SOCKET_PATH = '/api/socket.io';
 /** Activity types after which a group's room membership must be recomputed. */
 const MEMBERSHIP_TYPES = new Set([
   'group.created', 'member.joined', 'member.rejoined', 'member.claimed', 'member.merged', 'member.left', 'member.removed',
+  'member.deleted_account',
 ]);
 
 export type ServerToClient = {

@@ -40,6 +40,7 @@ export function describe(a: Activity, nameOf: (memberId: string) => string, grou
     case 'member.claimed': return { text: <>{who} joined as {str(p.ghostName, 'a placeholder')}</> };
     case 'member.merged': return { text: <>{who} linked {str(p.ghostName, 'a placeholder')} to their account</> };
     case 'member.left': return { text: <>{who} left the group</> };
+    case 'member.deleted_account': return { text: <>A member deleted their account; their balance stays with {str(p.displayName, 'Deleted user')}</> };
     case 'invite.created': return { text: <>{who} created an invite link</> };
     case 'group.settings_changed':
       return { text: <>{who} {p.simplifyDebts === true ? 'turned on fewest payments' : 'switched to showing every debt'}</> };

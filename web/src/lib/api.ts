@@ -108,6 +108,7 @@ export const api = {
   devLogin: (name: string) => request<Me>('POST', '/dev/login', { body: { name } }),
   logout: () => request<undefined>('POST', '/auth/logout'),
   logoutAll: () => request<{ revoked: number }>('POST', '/auth/logout-all'),
+  deleteAccount: () => request<{ deleted: true; groups: number }>('DELETE', '/me', { body: { confirm: true } }),
   myGroups: () => get<MyGroups>('/groups'),
   createGroup: (name: string) => request<{ groupId: string; memberId: string }>('POST', '/groups', { body: { name } }),
   group: (groupId: string) => get<GroupDetail>(`/groups/${groupId}`),
