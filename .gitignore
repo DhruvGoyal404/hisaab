@@ -22,3 +22,8 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Playwright: browsers live inside the repo folder (coexistence rule), reports are local
+web/.playwright/
+web/test-results/
+web/playwright-report/

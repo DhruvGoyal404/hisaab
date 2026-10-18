@@ -19,6 +19,7 @@ const DB_ERRORS: Record<string, [status: number, code: string, message: string]>
 };
 const CONSTRAINT_ERRORS: Record<string, [status: number, code: string, message: string]> = {
   memberships_ghost_name_key: [409, 'ghost_name_taken', 'Someone in the group already has that name'],
+  expenses_pkey: [409, 'expense_exists', 'An expense with this id already exists'],
 };
 
 function translateDbError(err: unknown): unknown {

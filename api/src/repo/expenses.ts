@@ -183,12 +183,15 @@ async function lockedHead(tx: GroupTx, expenseId: string, expectedVersion: numbe
 
 export async function createExpense(
   pool: pg.Pool,
-  input: { groupId: string; userId: string; expense: ExpenseInput; idempotencyKey?: string },
+  input: { groupId: string; userId: string; expense: ExpenseInput; idempotencyKey?: string; expenseId?: string },
 ): Promise<{ expenseId: string; version: number; replayed: boolean }> {
+  // A client may choose the id (the web form does, so its live preview uses the same tie-break
+  // seed as the server and shows identical paise); otherwise the database generates one.
+  if (input.expenseId !== undefined && !isUuid(input.expenseId)) throw invalid('invalid_expense_id', 'expenseId must be a UUID');
   try {
     return await withGroupWrite(pool, input.groupId, input.userId, async (tx) => {
       const { rows } = await tx.client.query<{ id: string }>('select uuidv7() as id');
-      const expenseId = rows[0]?.id ?? '';
+      const expenseId = input.expenseId ?? rows[0]?.id ?? '';
       if (input.idempotencyKey !== undefined) {
         await claimIdempotencyKey(tx.client, input.userId, input.idempotencyKey, 'expense.create',
           { groupId: input.groupId, expense: input.expense }, expenseId);

@@ -107,6 +107,19 @@ describe('expenses over HTTP', () => {
     expect((await post(asha.agent, `${url}/restore`).set('If-Match', '3')).body).toEqual({ version: 4 });
   });
 
+  it('accepts a client-chosen expense id (so the web preview seeds allocate() like the server)', async () => {
+    const expenseId = randomUUID();
+    const body = { ...equalSplit(100, ashaMember, [ashaMember, bilalMember]), expenseId };
+    const created = await post(asha.agent, `/api/groups/${groupId}/expenses`).set('Idempotency-Key', randomUUID()).send(body);
+    expect(created.status).toBe(201);
+    expect((created.body as { expenseId: string }).expenseId).toBe(expenseId);
+    const dup = await post(asha.agent, `/api/groups/${groupId}/expenses`).set('Idempotency-Key', randomUUID()).send(body);
+    expect(dup.status).toBe(409);
+    expect((await post(asha.agent, `/api/groups/${groupId}/expenses`).send({ ...body, expenseId: 'nope' })).status).toBe(422);
+    // Undo it so the balances in the next test are unaffected.
+    expect((await del(asha.agent, `/api/groups/${groupId}/expenses/${expenseId}`).set('If-Match', '1')).status).toBe(200);
+  });
+
   it('settles up and refuses to let someone with a balance leave', async () => {
     const balances = (await asha.agent.get(`/api/groups/${groupId}/balances`)).body as { members: { memberId: string; balanceMinor: number }[] };
     const owes = balances.members.find((m) => m.memberId === ashaMember)?.balanceMinor ?? 0;

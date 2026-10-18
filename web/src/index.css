@@ -1,1 +1,160 @@
 @import "tailwindcss";
+@import "@fontsource/hind/400.css";
+@import "@fontsource/hind/500.css";
+@import "@fontsource/hind/600.css";
+@import "@fontsource/rozha-one/400.css";
+
+/*
+ * Hisaab's look comes from the bahi-khata, the red cloth-bound ledger: a crimson cover with
+ * marigold stitching, ruled pages with a red double margin line, amounts in a right-hand column,
+ * and an ink stamp when an account is closed. Contrast is checked for WCAG AA in both schemes.
+ */
+:root {
+  --page: #fcfcfe;
+  --ink: #1e1b3a;
+  --muted: #5a5775;
+  --rule: #e2e0ec;
+  --margin-line: #d98a96;
+  --band: #a3122a; /* the ledger cover: header band */
+  --band-ink: #ffffff;
+  --thread: #e8a80c; /* marigold stitching: decoration only, never text */
+  --accent: #a3122a; /* primary buttons */
+  --accent-ink: #ffffff;
+  --owe: #a3122a;
+  --owed: #0f6b4f;
+  --stamp: #2e2a7a;
+  --field: #ffffff;
+  --field-line: #8e8aa8;
+  --focus: #2e2a7a;
+  --danger-bg: #fdecef;
+  --sheet: #f3f2f8;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #16142a;
+    --ink: #eceaf6;
+    --muted: #b2afcc;
+    --rule: #2e2b52;
+    --margin-line: #8c3a4a;
+    --band: #6e0c1f;
+    --band-ink: #fff3f5;
+    --thread: #c98f0a;
+    --accent: #ff8a96;
+    --accent-ink: #16142a;
+    --owe: #ff9aa5;
+    --owed: #63dca6;
+    --stamp: #b8b3ff;
+    --field: #1e1c38;
+    --field-line: #7e7aa3;
+    --focus: #ffd166;
+    --danger-bg: #3a1622;
+    --sheet: #1d1b36;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --font-sans: "Hind", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Rozha One", Georgia, serif;
+  --color-page: var(--page);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-band: var(--band);
+  --color-band-ink: var(--band-ink);
+  --color-thread: var(--thread);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-owe: var(--owe);
+  --color-owed: var(--owed);
+  --color-stamp: var(--stamp);
+  --color-field: var(--field);
+  --color-field-line: var(--field-line);
+  --color-danger-bg: var(--danger-bg);
+  --color-sheet: var(--sheet);
+}
+
+@layer base {
+  html {
+    background: var(--page);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    min-height: 100dvh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Amounts line up like a ledger column. */
+  .amount {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* The ruled page: a red double margin line down the left, entries on hairline rules. */
+  .ledger {
+    position: relative;
+    padding-left: 1.75rem;
+    background-image: linear-gradient(var(--margin-line), var(--margin-line)),
+      linear-gradient(var(--margin-line), var(--margin-line));
+    background-size: 1px 100%, 1px 100%;
+    background-position: 0.75rem 0, 1rem 0;
+    background-repeat: no-repeat;
+  }
+  .ledger > li + li,
+  .ledger > div + div {
+    border-top: 1px solid var(--rule);
+  }
+
+  /* The ledger cover's marigold stitch under the header band. */
+  .stitch {
+    background-image: repeating-linear-gradient(90deg, var(--thread) 0 10px, transparent 10px 16px);
+    background-size: 100% 2px;
+    background-repeat: no-repeat;
+    background-position: 0 calc(100% - 6px);
+  }
+
+  /* The ink stamp for a closed account: hisaab barabar. */
+  .stamp {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 0.35rem 0.9rem 0.25rem;
+    border: 3px double var(--stamp);
+    border-radius: 6px;
+    color: var(--stamp);
+    transform: rotate(-6deg);
+    line-height: 1.05;
+  }
+  .stamp-in {
+    animation: stamp-in 260ms cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+  }
+  @keyframes stamp-in {
+    from {
+      opacity: 0;
+      transform: rotate(-14deg) scale(1.6);
+    }
+    to {
+      opacity: 1;
+      transform: rotate(-6deg) scale(1);
+    }
+  }
+}

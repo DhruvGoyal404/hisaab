@@ -121,10 +121,11 @@ export function apiRoutes(pool: pg.Pool): Router {
 
   // Expenses
   router.post('/groups/:groupId/expenses', async (req, res) => {
-    const expense = expenseBody.parse(req.body);
+    const { expenseId, ...expense } = expenseBody.extend({ expenseId: z.string().optional() }).parse(req.body);
     const key = idempotencyKey(req);
     const r = await createExpense(pool, {
-      groupId: req.params.groupId, userId: user(res), expense, ...(key !== undefined && { idempotencyKey: key }),
+      groupId: req.params.groupId, userId: user(res), expense,
+      ...(key !== undefined && { idempotencyKey: key }), ...(expenseId !== undefined && { expenseId }),
     });
     res.status(r.replayed ? 200 : 201).set('Idempotent-Replay', String(r.replayed)).json({ expenseId: r.expenseId, version: r.version });
   });

@@ -5,7 +5,7 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default defineConfig(
-  { ignores: ['**/dist/', '**/coverage/', '**/node_modules/'] },
+  { ignores: ['**/dist/', '**/coverage/', '**/node_modules/', 'web/.playwright/', 'web/test-results/', 'web/playwright-report/'] },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   {
