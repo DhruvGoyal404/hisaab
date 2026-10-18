@@ -63,3 +63,8 @@ Another project (CodeJudge, in `../CodeEditor`) runs on this machine at the same
 - Docker Desktop is shared: never stop, remove, prune or restart containers, images or volumes Hisaab didn't create. Never touch anything labelled `judge.managed` or in the `codejudge` project. Never change Docker Desktop settings.
 - RAM is tight (WSL capped at 6 GB, CodeJudge runs heavy sandbox tests). Postgres is limited to 256 MB. Don't leave long-running services up without reason, and ask before heavy installs.
 - CI minutes are shared with CodeJudge's private repo: keep workflows lean (one job, cancel superseded runs, skip docs-only changes).
+
+## CI and verification rules
+
+- **Every CI step that pipes output must run with `set -o pipefail`** (or `shell: bash`, which GitHub runs as `bash -eo pipefail`), or avoid pipes. The default `bash -e` returns the last command's status, so `cmd | tee` hides failures. That has happened twice.
+- The same applies locally: never decide pass/fail from filtered output (`… | grep`). Capture the output to a file, check the command's exit code, then read the file.

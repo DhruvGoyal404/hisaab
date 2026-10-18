@@ -22,7 +22,31 @@ Let **m** be the largest number of disjoint, non-empty, zero-sum groups the k me
 
 So **the minimum number of transfers is exactly k − m**. Finding the minimum is the same as finding the most disjoint zero-sum groups.
 
-**Corollary: pair cancellation is free.** If bₐ = +x and b_b = −x, some optimal partition contains {a, b} as its own group. Suppose a and b sit in different zero-sum groups G₁ and G₂. Then G₁ ∪ G₂ splits into {a, b} and (G₁ ∪ G₂) \ {a, b}, both zero-sum, so the number of groups doesn't drop. Auto mode therefore pays every exact opposite pair directly before solving the rest.
+### Pairing exact opposites first never costs optimality
+
+**Claim.** Let bₐ = +x and b_b = −x. Settling a and b with the single transfer b → a, then settling everyone else optimally, gives an optimal plan for the whole group.
+
+**Exchange argument.** Let P be any partition of the k members into m zero-sum groups, with m maximal. We transform P, without lowering its number of groups, into a partition P′ that has {a, b} as a group of its own.
+
+1. **a and b are in the same group G.**
+   - If G = {a, b}, take P′ = P.
+   - Otherwise G \ {a, b} is non-empty and still sums to zero, because a and b cancel. Replace G with the two groups {a, b} and G \ {a, b}. That gives m + 1 groups, contradicting maximality, so in an optimal P this sub-case cannot occur.
+2. **a is in G₁ and b is in G₂, with G₁ ≠ G₂.**
+   - Exchange them: replace G₁ and G₂ with {a, b} and (G₁ ∪ G₂) \ {a, b}.
+   - The second set sums to 0 + 0 − x + x = 0. It is non-empty, because |G₁| + |G₂| ≥ 4: each of G₁, G₂ is zero-sum and contains a non-zero member, so each has at least two members.
+   - The number of groups is still m, so the result P′ is still optimal.
+
+Either way, some optimal partition contains {a, b}.
+
+**Why the rest can then be solved on its own.** Write R for the members other than a and b, and m(·) for the largest number of zero-sum groups.
+- Removing {a, b} from P′ leaves a zero-sum partition of R into m − 1 groups, so m(R) ≥ m − 1.
+- Conversely, any partition of R plus the group {a, b} is a partition of everyone, so m ≥ m(R) + 1.
+
+Hence m(R) = m − 1. The minimum number of transfers is then k − m = (k − 2) − m(R) + 1, which is one transfer for the pair plus the minimum for R.
+
+**Induction.** Apply the same step to the next opposite pair within R. Ties, such as two creditors at +x, don't matter: the argument holds for whichever pair is picked. So cancelling all opposite pairs first, in any order, preserves the optimum.
+
+This is why auto mode pays every exact opposite pair directly before solving the rest. It also shrinks k for the exact DP, which is exponential in k.
 
 ## Why it is NP-hard
 
@@ -78,7 +102,7 @@ A bitmask DP over the k non-zero members, indexed in id order.
 
 ### Auto ([`auto.ts`](../api/src/settle/auto.ts))
 
-1. Pay every exact opposite pair (+x, −x) directly. This is free, by the corollary above.
+1. Pay every exact opposite pair (+x, −x) directly. This is free; see [Pairing exact opposites first never costs optimality](#pairing-exact-opposites-first-never-costs-optimality).
 2. If at most **18** members remain, solve them exactly; otherwise use greedy.
 
 The response's `k` counts members before pair cancellation. Auto is what a group gets by default.
