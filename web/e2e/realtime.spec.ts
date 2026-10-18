@@ -23,9 +23,11 @@ test('A adds an expense in the UI; B sees it without reloading', async ({ browse
   await responded;
   const committedAt = performance.now();
 
-  // B's activity and balances update in place.
-  await expect(bilal.page.getByText('Midnight maggi')).toBeVisible({ timeout: 10_000 });
+  // B's activity and balances update in place, and screen readers hear about it.
+  const feed = bilal.page.getByRole('list', { name: 'Group activity, newest first' });
+  await expect(feed.getByText('Midnight maggi')).toBeVisible({ timeout: 10_000 });
   const latencyMs = performance.now() - committedAt;
+  await expect(bilal.page.getByRole('status').filter({ hasText: 'Asha added Midnight maggi' })).toBeAttached();
   await expect(bilal.page.getByText('owes ₹90.00')).toBeVisible();
   expect(reloads).toBe(0);
   test.info().annotations.push({ type: 'latency', description: `${latencyMs.toFixed(0)} ms from A's response to B's screen` });
