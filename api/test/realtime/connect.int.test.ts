@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createExpense } from '../../src/repo/expenses.js';
 import { createGroup } from '../../src/repo/groups.js';
 import { expense } from '../db/fixtures.js';
-import { recorder, startStack, until } from './harness.js';
+import { quiet, recorder, startStack, until } from './harness.js';
 
 let stack: Awaited<ReturnType<typeof startStack>>;
 beforeAll(async () => {
@@ -33,7 +33,10 @@ describe('socket server', () => {
     await stack.ready(s);
     const got = recorder(s);
     s.emit('sync', { [a.groupId]: 1, [b.groupId]: 1 }); // a is at seq 2, b at 1
-    await until(() => got.length === 1);
-    expect(got).toEqual([{ groupId: a.groupId, seq: 2 }]);
+    await until(() => got.some((x) => x.groupId === a.groupId && x.seq === 2));
+    await quiet(200);
+    // Late signals for seqs the client already has may still arrive (setting up the groups just
+    // committed); the contract is only that nothing newer than lastSeen is claimed for b.
+    expect(got.filter((x) => x.groupId === b.groupId && x.seq > 1)).toEqual([]);
   });
 });
