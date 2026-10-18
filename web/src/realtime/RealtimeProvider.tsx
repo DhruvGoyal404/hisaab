@@ -1,6 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { io } from 'socket.io-client';
 import { api, keys, type Activity } from '../lib/api';
 import { useMe } from '../lib/auth';
 import { GroupSync, type Status } from './sync';
@@ -43,23 +42,31 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!userId) return;
-    const socket = io({ path: '/api/socket.io', transports: ['websocket'] });
-    const s = new GroupSync({
-      socket,
-      fetchAfter: api.activityAfter,
-      onGroupChanged: (groupId, items) => {
-        void qc.invalidateQueries({ queryKey: keys.group(groupId) });
-        void qc.invalidateQueries({ queryKey: keys.myGroups });
-        setMessage(announce(items));
-      },
-      onUnknownGroup: () => { void qc.invalidateQueries({ queryKey: keys.myGroups }); },
-      onStatus: setStatus,
-      onServerDisconnect: () => { void qc.invalidateQueries({ queryKey: keys.me }); },
+    let cancelled = false;
+    let stop: () => void = () => undefined;
+    // socket.io-client loads after first paint: it is a tenth of the bundle and the page works without it.
+    void import('socket.io-client').then(({ io }) => {
+      if (cancelled) return;
+      const socket = io({ path: '/api/socket.io', transports: ['websocket'] });
+      const s = new GroupSync({
+        socket,
+        fetchAfter: api.activityAfter,
+        onGroupChanged: (groupId, items) => {
+          void qc.invalidateQueries({ queryKey: keys.group(groupId) });
+          void qc.invalidateQueries({ queryKey: keys.myGroups });
+          setMessage(announce(items));
+        },
+        onUnknownGroup: () => { void qc.invalidateQueries({ queryKey: keys.myGroups }); },
+        onStatus: setStatus,
+        onServerDisconnect: () => { void qc.invalidateQueries({ queryKey: keys.me }); },
+      });
+      for (const [g, seq] of seen.current) s.track(g, seq);
+      sync.current = s;
+      stop = () => { s.stop(); };
     });
-    for (const [g, seq] of seen.current) s.track(g, seq);
-    sync.current = s;
     return () => {
-      s.stop();
+      cancelled = true;
+      stop();
       sync.current = null;
       setStatus('offline');
     };

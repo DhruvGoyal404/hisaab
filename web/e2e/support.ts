@@ -3,11 +3,14 @@ import { expect, type APIRequestContext, type Browser, type BrowserContext, type
 
 export const ORIGIN = 'http://localhost:5174';
 
-type Ids = { groupId: string; members: Record<string, string> };
+type Ids = { groupId: string; members: Record<'asha' | 'bilal' | 'chirag' | 'dev', string> };
+
+/** Contexts made by hand get baseURL explicitly rather than relying on config inheritance. */
+export const contextOptions = (o: Parameters<Browser['newContext']>[0] = {}) => ({ baseURL: ORIGIN, ...o });
 
 /** A signed-in browser context for `name` (dev sign-in through the API; the cookie lands in the context). */
 export async function signedIn(browser: Browser, name: string, options: Parameters<Browser['newContext']>[0] = {}): Promise<{ context: BrowserContext; page: Page; userId: string }> {
-  const context = await browser.newContext(options);
+  const context = await browser.newContext({ baseURL: ORIGIN, ...options });
   const res = await context.request.post('/api/dev/login', { data: { name }, headers: { Origin: ORIGIN } });
   expect(res.ok()).toBeTruthy();
   const userId = ((await res.json()) as { user: { id: string } }).user.id;

@@ -2,7 +2,7 @@
 // Run on demand: npx playwright test screenshots  (SCREENSHOT_DIR overrides the output folder).
 import { fileURLToPath } from 'node:url';
 import { test, type Page } from '@playwright/test';
-import { seedTrip, signedIn } from './support';
+import { contextOptions, seedTrip, signedIn } from './support';
 
 const OUT = process.env.SCREENSHOT_DIR ?? fileURLToPath(new URL('../../docs/img', import.meta.url));
 const SIZES = { phone: { width: 390, height: 844 }, desktop: { width: 1280, height: 860 } } as const;
@@ -45,7 +45,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await page.goto(`/groups/${groupId}/settle`);
       await shot('settle-up');
 
-      const anon = await browser.newContext(opts);
+      const anon = await browser.newContext(contextOptions(opts));
       const signIn = await anon.newPage();
       await signIn.goto('/signin');
       await shot('signin', signIn);

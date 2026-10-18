@@ -7,7 +7,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit && tsc -p e2e",
-    "test": "vitest run"
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "size": "node scripts/bundle-size.js"
   },
   "dependencies": {
     "@fontsource/hind": "5.3.0",
