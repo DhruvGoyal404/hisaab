@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { allocate, AllocationError, MAX_TOTAL_MINOR, type SplitMethod, type WeightInput } from '../domain/allocate.js';
+import { allocate, AllocationError, MAX_TOTAL_MINOR, type SplitMethod, type WeightInput } from '@hisaab/money';
 import { HttpError } from '../errors.js';
 import { claimIdempotencyKey, IdempotentReplay } from './idempotency.js';
 import { isUuid, logActivity, notFound, withGroupRead, withGroupWrite, type GroupTx } from './tx.js';

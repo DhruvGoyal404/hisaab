@@ -21,6 +21,13 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
+    // Shared with the browser: no Node built-ins in the money core.
+    files: ['packages/money/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['node:*'], message: '@hisaab/money runs in the browser too.' }] }],
+    },
+  },
+  {
     files: ['web/**/*.{ts,tsx}'],
     extends: [reactHooks.configs.flat.recommended],
     languageOptions: { globals: globals.browser },

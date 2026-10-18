@@ -1,0 +1,17 @@
+{
+  "name": "@hisaab/money",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Money in integer paise: the one allocation function, parsing and formatting. Shared by api and web.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@noble/hashes": "2.4.0"
+  }
+}

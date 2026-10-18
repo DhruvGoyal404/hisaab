@@ -1,5 +1,5 @@
 import type pg from 'pg';
-import { MAX_TOTAL_MINOR } from '../domain/allocate.js';
+import { MAX_TOTAL_MINOR } from '@hisaab/money';
 import { HttpError } from '../errors.js';
 import { claimIdempotencyKey, IdempotentReplay } from './idempotency.js';
 import { isUuid, logActivity, withGroupWrite } from './tx.js';

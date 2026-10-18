@@ -10,6 +10,7 @@ Never use the name of the trademarked app this is modelled on in UI, repo, packa
 |---|---|---|
 | `api/` | Node 22, TypeScript strict, Express 5, zod, pg, pino | 8081 |
 | `web/` | Vite, React 19, TypeScript strict, Tailwind v4, TanStack Query, React Router | 5174 (proxies `/api` to 8081) |
+| `packages/money/` | `@hisaab/money`: allocate(), money parsing/formatting; pure TS, no Node built-ins, imported by api and web | |
 | `db/migrations/` | PostgreSQL 18, plain-SQL migrations via dbmate | host 5434 |
 | Real-time (Phase 4) | Socket.IO, cookie-authenticated, server-assigned group rooms | shares 8081 |
 | Auth (Phase 6) | Google OIDC (code + PKCE, `openid email profile`, require `email_verified`) and GitHub sign-in; server-side sessions | |

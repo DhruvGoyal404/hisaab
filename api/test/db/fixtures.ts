@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import pg from 'pg';
 import { inject } from 'vitest';
 import '../../src/db.js'; // registers the int8 parser
-import type { SplitMethod } from '../../src/domain/allocate.js';
+import type { SplitMethod } from '@hisaab/money';
 import { HttpError } from '../../src/errors.js';
 import type { ExpenseInput } from '../../src/repo/expenses.js';
 import { createGroup } from '../../src/repo/groups.js';

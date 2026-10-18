@@ -8,7 +8,7 @@ import {
   PERCENT_SCALE,
   type SplitMethod,
   type WeightInput,
-} from '../src/domain/allocate.js';
+} from '../src/allocate.js';
 import { propertyTimeout, runs } from './fc.js';
 
 const RUNS = runs(2_000);

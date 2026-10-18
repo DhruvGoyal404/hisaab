@@ -1,4 +1,4 @@
-import { largestRemainder } from '../domain/allocate.js';
+import { largestRemainder } from '@hisaab/money';
 import { byId, SettleError, type Transfer } from './types.js';
 
 /** A current (head, not deleted) expense version, with members already resolved to effective ids. */

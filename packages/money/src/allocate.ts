@@ -1,4 +1,5 @@
-import { createHash } from 'node:crypto';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 
 /** ₹100 crore in paise: the largest expense total (matches the DB check). */
 export const MAX_TOTAL_MINOR = 100_000_000_000;
@@ -17,8 +18,12 @@ export class AllocationError extends Error {
   override name = 'AllocationError';
 }
 
+/**
+ * sha256(seed ‖ NUL ‖ memberId) in hex. Pure JS (@noble/hashes) so the browser's live preview and
+ * the server compute byte-identical keys, hence identical paise.
+ */
 function tiebreakKey(seed: string, memberId: string): string {
-  return createHash('sha256').update(seed).update('\u0000').update(memberId).digest('hex');
+  return bytesToHex(sha256(utf8ToBytes(`${seed}\u0000${memberId}`)));
 }
 
 function validate(totalMinor: number, method: SplitMethod, weights: readonly WeightInput[]): void {

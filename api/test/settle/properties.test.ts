@@ -1,6 +1,6 @@
 import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
-import { allocate } from '../../src/domain/allocate.js';
+import { allocate } from '@hisaab/money';
 import { autoSettle, DEFAULT_EXACT_THRESHOLD } from '../../src/settle/auto.js';
 import { exactSettle } from '../../src/settle/exact.js';
 import { greedySettle } from '../../src/settle/greedy.js';

@@ -14,7 +14,6 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "rootDir": ".",
     "outDir": "dist"
   },
   "include": ["src", "test", "scripts", "vitest.config.ts", "vitest.int.config.ts"]
