@@ -14,7 +14,7 @@ Never use the name of the trademarked app this is modelled on in UI, repo, packa
 | Real-time (Phase 4) | Socket.IO, cookie-authenticated, server-assigned group rooms | shares 8081 |
 | Auth (Phase 6) | Google OIDC (code + PKCE, `openid email profile`, require `email_verified`) and GitHub sign-in; server-side sessions | |
 
-The audit and design rationale are in [docs/AUDIT.md](docs/AUDIT.md); the implemented schema in [docs/SCHEMA.md](docs/SCHEMA.md); settlement algorithms and their measured thresholds in [docs/ALGORITHMS.md](docs/ALGORITHMS.md).
+The audit and design rationale are in [docs/AUDIT.md](docs/AUDIT.md); the implemented schema in [docs/SCHEMA.md](docs/SCHEMA.md); settlement algorithms and their measured thresholds in [docs/ALGORITHMS.md](docs/ALGORITHMS.md); the real-time design in [docs/REALTIME.md](docs/REALTIME.md).
 
 ## Commands
 
@@ -37,7 +37,7 @@ npm run test:int                 # API integration tests: creates, migrates and 
 | 1 | Foundations | Compose Postgres on 5434, API on 8081 and web on 5174 respond; CI green; no secrets in the repo; nothing collides with CodeJudge ports or project names |
 | 2 | Domain + ledger | Integration tests on real Postgres prove Σ balances = 0, UPDATE/DELETE on `activity_log` fails at the DB, another group's ids return 404, and a split sum ≠ total is rejected by the DB even if the app check is bypassed. **Done.** |
 | 3 | Simplification | Property tests (≥10k runs) pass; exact matches brute force for n ≤ 7; n = 20 benchmark recorded and greedy/exact threshold set from it. **Done** (see docs/ALGORITHMS.md). |
-| 4 | Real-time | Tests: non-member can't subscribe, bad Origin rejected, two clients converge after one misses N events while offline |
+| 4 | Real-time | Tests: non-member can't subscribe, bad Origin rejected, two clients converge after one misses N events while offline. **Done** (see docs/REALTIME.md). |
 | 5 | Frontend | Playwright e2e: create group → invite → add each split type → settle → balances reach zero in both browsers |
 | 6 | Auth + limits | Tests for rate limiting (429), Origin rejection, session revocation killing sockets, invite expiry; dev login refuses to start outside development/test |
 | 7 | Deploy | Public URL; backup restore tested; rollback documented; no secret in repo or image |
