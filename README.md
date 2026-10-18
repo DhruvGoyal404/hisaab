@@ -17,3 +17,11 @@ npm run db:bootstrap
 npm run dev:api    # http://localhost:8081/api/health
 npm run dev:web    # http://localhost:5174
 ```
+
+## Screens
+
+| Home | Group | Add expense | Settle up |
+|---|---|---|---|
+| ![Home on a phone](docs/img/home-phone-light.png) | ![Group activity on a phone](docs/img/group-phone-light.png) | ![Adding an expense with exact amounts](docs/img/add-expense-phone-light.png) | ![Suggested payments](docs/img/settle-plan-phone-light.png) |
+
+More in [docs/img](docs/img): every main screen at 390 px and 1280 px, plus dark mode. They're regenerated against a fresh database with `SCREENSHOTS=1 npx playwright test screenshots` (from `web/`, with the API and web dev servers running).
