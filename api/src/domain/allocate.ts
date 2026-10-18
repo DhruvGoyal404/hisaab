@@ -67,7 +67,15 @@ export function allocate(
   seed: string,
 ): Allocation[] {
   validate(totalMinor, method, weights);
+  return largestRemainder(totalMinor, weights, seed);
+}
 
+/**
+ * The division core shared by allocate() and the raw settlement view: largest remainder with
+ * sha256(seed, memberId) tie-breaks. Callers guarantee integer inputs, a non-negative total and a
+ * positive weight sum; allocate() validates them for user input. Returned in memberId order.
+ */
+export function largestRemainder(totalMinor: number, weights: readonly WeightInput[], seed: string): Allocation[] {
   // BigInt: total * weight can reach 1e22 for exact splits, beyond Number's safe range.
   const total = BigInt(totalMinor);
   const weightSum = weights.reduce((s, w) => s + BigInt(w.weight), 0n);
