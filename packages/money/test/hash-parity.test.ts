@@ -16,5 +16,5 @@ describe('tie-break hash parity', () => {
     fc.assert(fc.property(fc.string({ unit: 'binary' }), fc.string({ unit: 'binary' }), (seed, id) => {
       expect(nobleKey(seed, id)).toBe(nodeKey(seed, id));
     }), runs(5_000));
-  }, 30_000); // 5,000 property runs; the default 5 s is too tight on a busy machine
+  });
 });
