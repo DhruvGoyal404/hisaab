@@ -50,3 +50,5 @@ jobs:
         run: npm test
       - name: Integration tests
         run: npm run test:int
+      - name: Settlement benchmark (informational)
+        run: npm run -s bench:settle -w api | tee -a "$GITHUB_STEP_SUMMARY"

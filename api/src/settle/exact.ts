@@ -1,8 +1,8 @@
 import { greedySettle } from './greedy.js';
 import { nonZeroSorted, SettleError, type Balance, type Transfer } from './types.js';
 
-/** Memory/time guard: 2^20 masks is ~10 MB of typed arrays. Above this, use greedy. */
-export const MAX_EXACT_MEMBERS = 20;
+/** Time guard: at k = 20 the DP took 63 ms (p95) on the dev machine, over the 50 ms event-loop budget; k = 19 took 22 ms. */
+export const MAX_EXACT_MEMBERS = 19;
 
 const bitIndex = (bit: number): number => 31 - Math.clz32(bit);
 
