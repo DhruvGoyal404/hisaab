@@ -7,6 +7,7 @@ import { notFound } from '../repo/tx.js';
 import { startSession } from '../sessions.js';
 import { signInWith } from './accounts.js';
 import { consumeFlow, isProvider, OAuthError, safeReturnTo, startFlow, type Flow, type Provider } from './flows.js';
+import { githubAuthorizeUrl, githubProfile } from './github.js';
 import { googleAuthorizeUrl, googleProfile, type Profile } from './google.js';
 
 /** Binds a flow to the browser that started it (login CSRF defence); compared with ?state on return. */
@@ -21,10 +22,12 @@ export function oauthRouter(pool: pg.Pool, config: Config, logger: Logger): Rout
 
   const authorizeUrl = (p: Provider, f: { state: string; codeChallenge: string; nonce: string | null }): string => {
     if (p === 'google' && config.google) return googleAuthorizeUrl(config.google, redirectUri(p), f);
+    if (p === 'github' && config.github) return githubAuthorizeUrl(config.github, redirectUri(p), f);
     throw notFound();
   };
   const profileFor = (p: Provider, code: string, flow: Flow): Promise<Profile> => {
     if (p === 'google' && config.google) return googleProfile(config.google, redirectUri(p), code, flow);
+    if (p === 'github' && config.github) return githubProfile(config.github, redirectUri(p), code, flow);
     throw notFound();
   };
 
@@ -36,7 +39,7 @@ export function oauthRouter(pool: pg.Pool, config: Config, logger: Logger): Rout
 
   /** Which sign-in options the sign-in page should offer. */
   router.get('/auth/providers', (_req, res) => {
-    res.json({ google: config.google !== undefined, github: false, dev: config.devLogin });
+    res.json({ google: config.google !== undefined, github: config.github !== undefined, dev: config.devLogin });
   });
 
   router.get('/auth/:provider/start', async (req, res) => {
