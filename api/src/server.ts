@@ -1,6 +1,7 @@
 import { createApp } from './app.js';
 import { ConfigError, loadConfig, type Config } from './config.js';
 import { createPool } from './db.js';
+import { createRateLimits } from './limits.js';
 import { createLogger } from './logger.js';
 import { PgListener } from './realtime/listener.js';
 import { createRealtime } from './realtime/server.js';
@@ -18,7 +19,8 @@ try {
 
 const logger = createLogger(config.logLevel);
 const pool = createPool(config.databaseUrl, logger);
-const app = createApp({ config, logger, pool });
+const rateLimits = createRateLimits(pool, logger);
+const app = createApp({ config, logger, pool, rateLimits });
 
 // The LISTEN connection retries in the background, so an unreachable database never blocks startup.
 const listener = new PgListener(config.databaseUrl, logger);
@@ -29,7 +31,9 @@ const server = app.listen(config.port, config.host, () => {
   const port = typeof addr === 'object' && addr ? addr.port : config.port;
   logger.info({ host: config.host, port, nodeEnv: config.nodeEnv }, 'api listening');
 });
-const realtime = createRealtime({ httpServer: server, pool, listener, logger, allowedOrigins: config.webOrigins });
+const realtime = createRealtime({
+  httpServer: server, pool, listener, logger, allowedOrigins: config.webOrigins, connectLimit: rateLimits.socket,
+});
 
 function shutdown(signal: string): void {
   logger.info({ signal }, 'shutting down');

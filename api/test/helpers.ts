@@ -2,6 +2,7 @@ import { pino } from 'pino';
 import { createApp } from '../src/app.js';
 import { loadConfig, type Config } from '../src/config.js';
 import { createPool } from '../src/db.js';
+import { createRateLimits, type Limits } from '../src/limits.js';
 
 export const WEB_ORIGIN = 'http://localhost:5174';
 
@@ -19,9 +20,18 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
   return loadConfig({ ...baseEnv, ...overrides });
 }
 
+/** Limits no ordinary test gets near: the suites share one database and sign in from 127.0.0.1. */
+export const GENEROUS_LIMITS: Limits = {
+  auth: { points: 1_000_000, duration: 60 },
+  expense: { points: 1_000_000, duration: 60 },
+  settlement: { points: 1_000_000, duration: 60 },
+  invite: { points: 1_000_000, duration: 60 },
+  socket: { points: 1_000_000, duration: 60 },
+};
+
 export function buildApp(overrides: Record<string, string> = {}) {
   const config = testConfig(overrides);
   const logger = pino({ level: 'silent' });
   const pool = createPool(config.databaseUrl, logger);
-  return { app: createApp({ config, logger, pool }), pool, config };
+  return { app: createApp({ config, logger, pool, rateLimits: createRateLimits(pool, logger, GENEROUS_LIMITS) }), pool, config };
 }

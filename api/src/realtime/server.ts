@@ -4,6 +4,8 @@ import type pg from 'pg';
 import type { Logger } from 'pino';
 import { Server, type Socket } from 'socket.io';
 import { z } from 'zod';
+import { HttpError } from '../errors.js';
+import type { RateLimit } from '../limits.js';
 import { findSession, SESSION_COOKIE } from '../sessions.js';
 import type { GroupSignal, PgListener } from './listener.js';
 
@@ -58,6 +60,8 @@ export type RealtimeOptions = {
   logger: Logger;
   allowedOrigins: readonly string[];
   rateLimit?: { burst: number; perSecond: number };
+  /** Connections per user (rate-limiter-flexible); a refused handshake gets `rate_limited` with retryAfterSeconds. */
+  connectLimit?: RateLimit;
 };
 
 export type Realtime = {
@@ -95,9 +99,15 @@ export function createRealtime(opts: RealtimeOptions): Realtime {
       return;
     }
     findSession(pool, token).then(
-      (session) => {
+      async (session) => {
         if (!session) {
           next(new Error('unauthenticated'));
+          return;
+        }
+        try {
+          await opts.connectLimit?.(session.userId);
+        } catch (err) {
+          next(err instanceof HttpError ? Object.assign(new Error('rate_limited'), { data: err.details }) : new Error('unavailable'));
           return;
         }
         socket.data.userId = session.userId;

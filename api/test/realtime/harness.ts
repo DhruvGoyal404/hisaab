@@ -6,9 +6,10 @@ import request from 'supertest';
 import { inject } from 'vitest';
 import { createApp } from '../../src/app.js';
 import { createPool } from '../../src/db.js';
+import { createRateLimits, type Limits } from '../../src/limits.js';
 import { PgListener } from '../../src/realtime/listener.js';
 import { createRealtime, SOCKET_PATH, type ClientToServer, type ServerToClient } from '../../src/realtime/server.js';
-import { testConfig, WEB_ORIGIN } from '../helpers.js';
+import { GENEROUS_LIMITS, testConfig, WEB_ORIGIN } from '../helpers.js';
 
 export type TestSocket = ClientSocket<ServerToClient, ClientToServer>;
 
@@ -23,15 +24,18 @@ export async function until(cond: () => boolean, ms = 5_000, what = 'condition')
 export const quiet = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** The real app + listener + Socket.IO server on an ephemeral port, against the test database. */
-export async function startStack(rateLimit?: { burst: number; perSecond: number }) {
+export async function startStack(rateLimit?: { burst: number; perSecond: number }, limits: { values?: Limits; namespace?: string } = {}) {
   const config = testConfig({ DEV_LOGIN: 'true', DATABASE_URL: inject('appDatabaseUrl') });
   const logger = pino({ level: 'silent' });
   const pool = createPool(config.databaseUrl, logger);
   const listener = new PgListener(config.databaseUrl, logger, { minMs: 20, maxMs: 200 });
   listener.start();
-  const app = createApp({ config, logger, pool });
+  const rateLimits = createRateLimits(pool, logger, limits.values ?? GENEROUS_LIMITS, limits.namespace);
+  const app = createApp({ config, logger, pool, rateLimits });
   const httpServer = createServer(app);
-  const realtime = createRealtime({ httpServer, pool, listener, logger, allowedOrigins: config.webOrigins, ...(rateLimit && { rateLimit }) });
+  const realtime = createRealtime({
+    httpServer, pool, listener, logger, allowedOrigins: config.webOrigins, connectLimit: rateLimits.socket, ...(rateLimit && { rateLimit }),
+  });
   await new Promise<void>((resolve) => httpServer.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${(httpServer.address() as AddressInfo).port}`;
   await until(() => listener.listening, 10_000, 'listener connected');

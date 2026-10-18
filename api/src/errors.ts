@@ -57,5 +57,7 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, next) 
 
   if (status >= 500) req.log.error({ err }, 'unhandled error');
   else req.log.info({ code: body.error.code }, 'client error');
+  const retryAfter = body.error.details?.retryAfterSeconds;
+  if (status === 429 && typeof retryAfter === 'number') res.set('Retry-After', String(retryAfter));
   res.status(status).json(body);
 };

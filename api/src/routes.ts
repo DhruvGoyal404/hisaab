@@ -3,6 +3,7 @@ import type pg from 'pg';
 import { z } from 'zod';
 import { requireSession, sessionOf } from './auth.js';
 import { HttpError } from './errors.js';
+import { limitBy, type RateLimits } from './limits.js';
 import { createExpense, deleteExpense, editExpense, getExpense, restoreExpense } from './repo/expenses.js';
 import {
   acceptInvite, addGhost, createGroup, createInvite, leaveGroup, previewInvite, setSimplifyDebts,
@@ -49,10 +50,12 @@ function ifMatch(req: Request): number {
 }
 
 /** Every route here needs a signed-in user; group routes also need membership (404 otherwise). */
-export function apiRoutes(pool: pg.Pool): Router {
+export function apiRoutes(pool: pg.Pool, rateLimits: RateLimits): Router {
   const router = Router();
   router.use(['/me', '/groups', '/invites'], requireSession(pool));
   const user = (res: Parameters<typeof sessionOf>[0]) => sessionOf(res).userId;
+  // Per user, on the writes that create things.
+  const perUser = (limit: keyof RateLimits) => limitBy(rateLimits[limit], (_req, res) => user(res));
 
   router.get('/me', (_req, res) => {
     const s = sessionOf(res);
@@ -105,6 +108,7 @@ export function apiRoutes(pool: pg.Pool): Router {
     const { displayName } = ghostBody.parse(req.body);
     res.status(201).json({ memberId: await addGhost(pool, { groupId: req.params.groupId, userId: user(res), displayName }) });
   });
+  router.post('/groups/:groupId/invites', perUser('invite'));
   router.post('/groups/:groupId/invites', async (req, res) => {
     const { ghostMemberId } = inviteBody.parse(req.body ?? {});
     const invite = await createInvite(pool, {
@@ -120,6 +124,7 @@ export function apiRoutes(pool: pg.Pool): Router {
   });
 
   // Expenses
+  router.post('/groups/:groupId/expenses', perUser('expense'));
   router.post('/groups/:groupId/expenses', async (req, res) => {
     const { expenseId, ...expense } = expenseBody.extend({ expenseId: z.string().optional() }).parse(req.body);
     const key = idempotencyKey(req);
@@ -155,6 +160,7 @@ export function apiRoutes(pool: pg.Pool): Router {
   });
 
   // Settlements
+  router.post('/groups/:groupId/settlements', perUser('settlement'));
   router.post('/groups/:groupId/settlements', async (req, res) => {
     const settlement = settlementBody.parse(req.body);
     const key = idempotencyKey(req);
