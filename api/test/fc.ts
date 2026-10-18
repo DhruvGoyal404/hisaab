@@ -8,8 +8,13 @@ import fc from 'fast-check';
 
 const env = process.env;
 
+// Always choose the seed here and print it, so even a failure the reporter never sees (an
+// arbitrary throwing during generation) can be replayed from the log with FC_SEED.
+const seed = env.FC_SEED !== undefined ? Number(env.FC_SEED) : (Date.now() ^ (Math.random() * 0x100000000)) | 0;
+process.stderr.write(`[fast-check] seed=${seed} (replay with FC_SEED=${seed})\n`);
+
 fc.configureGlobal({
-  ...(env.FC_SEED !== undefined && { seed: Number(env.FC_SEED) }),
+  seed,
   ...(env.FC_PATH !== undefined && { path: env.FC_PATH }),
   ...(env.FC_NUM_RUNS !== undefined && { numRuns: Number(env.FC_NUM_RUNS) }),
   reporter: (out) => {
