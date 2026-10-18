@@ -9,8 +9,9 @@ import {
   type SplitMethod,
   type WeightInput,
 } from '../src/domain/allocate.js';
+import { propertyTimeout, runs } from './fc.js';
 
-const RUNS = { numRuns: 2_000 };
+const RUNS = runs(2_000);
 
 const memberIds = (n: number) => fc.uniqueArray(fc.uuid(), { minLength: n, maxLength: n });
 
@@ -59,7 +60,7 @@ const anyCase: fc.Arbitrary<Case> = fc
 
 const run = (c: Case) => allocate(c.total, c.method, c.weights, c.seed);
 
-describe('allocate: properties', { timeout: 60_000 }, () => {
+describe('allocate: properties', { timeout: propertyTimeout() }, () => {
   it('shares always sum to the total', () => {
     fc.assert(fc.property(anyCase, (c) => {
       expect(run(c).reduce((s, a) => s + a.owedMinor, 0)).toBe(c.total);
@@ -102,7 +103,7 @@ describe('allocate: properties', { timeout: 60_000 }, () => {
   it('exact splits come back unchanged', () => {
     fc.assert(fc.property(anyCase.filter((c) => c.method === 'exact'), (c) => {
       for (const a of run(c)) expect(a.owedMinor).toBe(a.weight);
-    }), { numRuns: 500 });
+    }), runs(500));
   });
 });
 
