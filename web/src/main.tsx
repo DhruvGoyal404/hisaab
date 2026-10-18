@@ -33,6 +33,7 @@ const router = createBrowserRouter([
       { path: '/groups/:groupId/expenses/:expenseId', lazy: async () => ({ Component: (await expensePages()).ExpensePage }) },
       { path: '/groups/:groupId/expenses/:expenseId/edit', lazy: async () => ({ Component: (await expensePages()).EditExpensePage }) },
       { path: '/groups/:groupId/settle', lazy: async () => ({ Component: (await import('./pages/SettleUpPage')).SettleUpPage }) },
+      { path: '/account', lazy: async () => ({ Component: (await import('./pages/AccountPage')).AccountPage }) },
       { path: '/join/:token', lazy: async () => ({ Component: (await import('./pages/JoinPage')).JoinPage }) },
     ],
   },

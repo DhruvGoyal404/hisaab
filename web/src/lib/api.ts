@@ -35,6 +35,7 @@ const get = <T,>(path: string) => request<T>('GET', path);
 // ---- Shapes returned by the API (integers are paise) ----
 export type Me = { user: { id: string; name: string } };
 export type Providers = { google: boolean; github: boolean; dev: boolean };
+export type Identity = { provider: 'google' | 'github'; email: string | null; linkedAt: string };
 export type GroupSummary = { groupId: string; name: string; currency: string; balanceMinor: number };
 export type MyGroups = {
   groups: GroupSummary[];
@@ -103,6 +104,7 @@ export type InvitePreview = {
 export const api = {
   me: () => get<Me>('/me'),
   providers: () => get<Providers>('/auth/providers'),
+  identities: () => get<{ identities: Identity[] }>('/auth/identities'),
   devLogin: (name: string) => request<Me>('POST', '/dev/login', { body: { name } }),
   logout: () => request<undefined>('POST', '/dev/logout'),
   myGroups: () => get<MyGroups>('/groups'),

@@ -1,31 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type SubmitEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { AppShell, BalanceWords, Button, ErrorNote, Field, LedgerSection, Loading, Money, Stamp } from '../components/ui';
+import { AppShell, BalanceWords, btn, Button, ErrorNote, Field, LedgerSection, Loading, Money, Stamp } from '../components/ui';
 import { api, keys } from '../lib/api';
 import { useMe } from '../lib/auth';
 
 export function HomePage() {
   const me = useMe();
   const groups = useQuery({ queryKey: keys.myGroups, queryFn: api.myGroups });
-  const qc = useQueryClient();
-  const navigate = useNavigate();
-  const signOut = useMutation({
-    mutationFn: api.logout,
-    onSuccess: async () => {
-      qc.clear();
-      await navigate('/signin', { replace: true });
-    },
-  });
 
   const total = groups.data?.totals.find((t) => t.currency === 'INR');
   return (
     <AppShell
       title={<span className="font-display text-3xl leading-none">Hisaab</span>}
       actions={
-        <Button variant="quiet" className="text-band-ink" onClick={() => { signOut.mutate(); }}>
-          Sign out
-        </Button>
+        <Link to="/account" className={`${btn.quiet} text-band-ink`}>Account</Link>
       }
     >
       <p className="mb-1 text-muted">Signed in as {me.data?.user.name}</p>

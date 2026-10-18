@@ -53,3 +53,41 @@ export function signInWith(pool: pg.Pool, provider: Provider, profile: Profile):
     throw err;
   });
 }
+
+export type LinkResult = 'linked' | 'already_linked' | 'identity_in_use' | 'provider_already_linked';
+
+/**
+ * Explicit linking by a signed-in user: attaches this provider identity to their account, unless
+ * it already belongs to another account, or the user already has an identity with this provider.
+ */
+export function linkIdentity(pool: pg.Pool, userId: string, provider: Provider, profile: Profile): Promise<LinkResult> {
+  return inTransaction(pool, async (client) => {
+    const { rows: owner } = await client.query<{ user_id: string }>(
+      'select user_id from oauth_identities where provider = $1 and subject = $2',
+      [provider, profile.subject],
+    );
+    if (owner[0]) return owner[0].user_id === userId ? 'already_linked' : 'identity_in_use';
+    const { rowCount } = await client.query('select 1 from oauth_identities where user_id = $1 and provider = $2', [userId, provider]);
+    if (rowCount) return 'provider_already_linked';
+    await client.query(
+      'insert into oauth_identities (user_id, provider, subject, email, email_verified) values ($1, $2, $3, $4, true)',
+      [userId, provider, profile.subject, profile.email],
+    );
+    return 'linked' as const;
+  }).catch((err: unknown) => {
+    const constraint = (err as { constraint?: string }).constraint;
+    if (constraint === 'oauth_identities_provider_subject_key') return 'identity_in_use' as const;
+    if (constraint === 'oauth_identities_user_id_provider_key') return 'provider_already_linked' as const;
+    throw err;
+  });
+}
+
+export type Identity = { provider: Provider; email: string | null; linkedAt: Date };
+
+export async function identitiesOf(pool: pg.Pool, userId: string): Promise<Identity[]> {
+  const { rows } = await pool.query<Identity>(
+    'select provider, email, created_at as "linkedAt" from oauth_identities where user_id = $1 order by provider',
+    [userId],
+  );
+  return rows;
+}

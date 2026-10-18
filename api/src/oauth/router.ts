@@ -2,10 +2,11 @@ import { parseCookie } from 'cookie';
 import { Router, type Response } from 'express';
 import type pg from 'pg';
 import type { Logger } from 'pino';
+import { requireSession, sessionOf } from '../auth.js';
 import type { Config } from '../config.js';
 import { notFound } from '../repo/tx.js';
-import { startSession } from '../sessions.js';
-import { signInWith } from './accounts.js';
+import { findSession, sessionToken, startSession } from '../sessions.js';
+import { identitiesOf, linkIdentity, signInWith } from './accounts.js';
 import { consumeFlow, isProvider, OAuthError, safeReturnTo, startFlow, type Flow, type Provider } from './flows.js';
 import { githubAuthorizeUrl, githubProfile } from './github.js';
 import { googleAuthorizeUrl, googleProfile, type Profile } from './google.js';
@@ -93,8 +94,27 @@ export function oauthRouter(pool: pg.Pool, config: Config, logger: Logger): Rout
       res.redirect(302, flow.returnTo);
       return;
     }
-    // Linking is handled in a later step; until then a link flow cannot complete.
-    fail('state_invalid', flow);
+    // Linking: only for the same signed-in user who started it, in this browser.
+    const token = sessionToken(req);
+    const session = token ? await findSession(pool, token) : undefined;
+    if (!session || session.userId !== flow.userId) {
+      fail('link_session_changed', flow);
+      return;
+    }
+    const linked = await linkIdentity(pool, session.userId, provider, profile);
+    if (linked === 'linked' || linked === 'already_linked') res.redirect(302, `/account?linked=${provider}`);
+    else fail(linked, flow);
+  });
+
+  // A signed-in user explicitly adds the other provider to their account.
+  router.get('/auth/:provider/link', requireSession(pool), async (req, res) => {
+    const provider = String(req.params.provider);
+    if (!configured(provider)) throw notFound();
+    await begin(res, provider, 'link', '/account', sessionOf(res).userId);
+  });
+
+  router.get('/auth/identities', requireSession(pool), async (_req, res) => {
+    res.json({ identities: await identitiesOf(pool, sessionOf(res).userId) });
   });
 
   return router;
