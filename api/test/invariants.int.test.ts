@@ -97,14 +97,26 @@ describe('splits must sum to the total (deferred check at COMMIT)', () => {
 
 /**
  * TRUNCATE ... CASCADE needs ACCESS EXCLUSIVE locks on the table and everything referencing it, in
- * a database other test files are writing to concurrently, so it can lose a deadlock (40P01)
- * before the trigger gets to answer. Retry those transient lock failures; the assertion is still
- * that the trigger itself rejects it.
+ * a database other test files are writing to concurrently. A short lock_timeout makes it give up
+ * (55P03) long before deadlock detection (1 s) could pick a victim, so it never takes another
+ * file's transaction down with it; it may still lose a deadlock (40P01) itself. Retry those
+ * transient lock failures; the assertion is still that the trigger itself rejects it.
  */
+async function truncateWithLockTimeout(table: string): Promise<unknown> {
+  const c = await owner.connect();
+  try {
+    await c.query("set lock_timeout = '100ms'");
+    return await c.query(`truncate ${table} cascade`);
+  } finally {
+    await c.query('reset lock_timeout').catch(() => undefined);
+    c.release();
+  }
+}
+
 async function ownerTruncateState(table: string): Promise<string> {
   for (let attempt = 0; ; attempt++) {
-    const state = await sqlState(owner.query(`truncate ${table} cascade`));
-    if ((state !== '40P01' && state !== '55P03') || attempt === 9) return state;
+    const state = await sqlState(truncateWithLockTimeout(table));
+    if ((state !== '40P01' && state !== '55P03') || attempt === 29) return state;
     await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
   }
 }

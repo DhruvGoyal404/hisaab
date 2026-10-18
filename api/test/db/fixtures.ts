@@ -9,7 +9,7 @@ import { createGroup } from '../../src/repo/groups.js';
 import { createUser } from '../../src/repo/users.js';
 
 /** Pool connected as the privilege-limited app role (what the API uses). */
-export const appPool = (): pg.Pool => new pg.Pool({ connectionString: inject('appDatabaseUrl'), max: 8 });
+export const appPool = (): pg.Pool => new pg.Pool({ connectionString: inject('appDatabaseUrl'), max: 4 });
 /** Pool connected as the owner role, for asserting the triggers hold even with full privileges. */
 export const ownerPool = (): pg.Pool => new pg.Pool({ connectionString: inject('ownerDatabaseUrl'), max: 2 });
 

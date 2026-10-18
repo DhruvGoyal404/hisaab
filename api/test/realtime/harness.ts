@@ -9,7 +9,7 @@ import { createPool } from '../../src/db.js';
 import { createRateLimits, type Limits } from '../../src/limits.js';
 import { PgListener } from '../../src/realtime/listener.js';
 import { createRealtime, SOCKET_PATH, type ClientToServer, type ServerToClient } from '../../src/realtime/server.js';
-import { GENEROUS_LIMITS, testConfig, WEB_ORIGIN } from '../helpers.js';
+import { GENEROUS_LIMITS, TEST_POOL_MAX, testConfig, WEB_ORIGIN } from '../helpers.js';
 
 export type TestSocket = ClientSocket<ServerToClient, ClientToServer>;
 
@@ -27,7 +27,7 @@ export const quiet = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export async function startStack(rateLimit?: { burst: number; perSecond: number }, limits: { values?: Limits; namespace?: string } = {}) {
   const config = testConfig({ DEV_LOGIN: 'true', DATABASE_URL: inject('appDatabaseUrl') });
   const logger = pino({ level: 'silent' });
-  const pool = createPool(config.databaseUrl, logger);
+  const pool = createPool(config.databaseUrl, logger, TEST_POOL_MAX);
   const listener = new PgListener(config.databaseUrl, logger, { minMs: 20, maxMs: 200 });
   listener.start();
   const rateLimits = createRateLimits(pool, logger, limits.values ?? GENEROUS_LIMITS, limits.namespace);

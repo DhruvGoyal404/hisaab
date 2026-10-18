@@ -9,10 +9,10 @@ pg.types.setTypeParser(pg.types.builtins.INT8, (value: string) => {
   return n;
 });
 
-export function createPool(databaseUrl: string, logger: Logger): pg.Pool {
+export function createPool(databaseUrl: string, logger: Logger, max = 10): pg.Pool {
   const pool = new pg.Pool({
     connectionString: databaseUrl,
-    max: 10,
+    max,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 2_000,
     statement_timeout: 5_000,

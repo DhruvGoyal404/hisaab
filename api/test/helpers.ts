@@ -20,6 +20,12 @@ export function testConfig(overrides: Record<string, string> = {}): Config {
   return loadConfig({ ...baseEnv, ...overrides });
 }
 
+/**
+ * Integration test files run in parallel against one Postgres whose local max_connections is 30
+ * (RAM is tight), so every pool a test opens stays small.
+ */
+export const TEST_POOL_MAX = 4;
+
 /** Limits no ordinary test gets near: the suites share one database and sign in from 127.0.0.1. */
 export const GENEROUS_LIMITS: Limits = {
   auth: { points: 1_000_000, duration: 60 },
@@ -32,6 +38,6 @@ export const GENEROUS_LIMITS: Limits = {
 export function buildApp(overrides: Record<string, string> = {}) {
   const config = testConfig(overrides);
   const logger = pino({ level: 'silent' });
-  const pool = createPool(config.databaseUrl, logger);
+  const pool = createPool(config.databaseUrl, logger, TEST_POOL_MAX);
   return { app: createApp({ config, logger, pool, rateLimits: createRateLimits(pool, logger, GENEROUS_LIMITS) }), pool, config };
 }

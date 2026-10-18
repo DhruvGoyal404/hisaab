@@ -9,5 +9,7 @@ export default defineConfig({
     // CI is quiet, so 20 s there means a real hang; this shared dev machine gets more room.
     testTimeout: process.env.CI ? 20_000 : 90_000,
     hookTimeout: 60_000,
+    // Each file holds a few connections (pools of 4 plus a LISTEN client); local max_connections is 30.
+    maxWorkers: 3,
   },
 });
