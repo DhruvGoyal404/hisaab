@@ -41,13 +41,14 @@ function zeroSumMasks(values: readonly number[]): Uint8Array {
  * the full mask along an optimal chain, the zero-sum masks on the chain cut it into m zero-sum
  * groups; each group of size s is settled with s − 1 transfers (greedy within the group).
  * O(2^k · k) time, O(2^k) memory. Members are indexed in id order, so the output is deterministic.
+ * `maxMembers` exists for the benchmark; callers use the default.
  */
-export function exactSettle(balances: readonly Balance[]): Transfer[] {
+export function exactSettle(balances: readonly Balance[], maxMembers = MAX_EXACT_MEMBERS): Transfer[] {
   const members = nonZeroSorted(balances);
   const k = members.length;
   if (k === 0) return [];
-  if (k > MAX_EXACT_MEMBERS) {
-    throw new SettleError(`exact settlement supports at most ${MAX_EXACT_MEMBERS} non-zero members, got ${k}`);
+  if (k > maxMembers) {
+    throw new SettleError(`exact settlement supports at most ${maxMembers} non-zero members, got ${k}`);
   }
 
   const size = 1 << k;

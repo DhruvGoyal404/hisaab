@@ -51,4 +51,5 @@ jobs:
       - name: Integration tests
         run: npm run test:int
       - name: Settlement benchmark (informational)
+        shell: bash # -eo pipefail, so a crash is not hidden by tee
         run: npm run -s bench:settle -w api | tee -a "$GITHUB_STEP_SUMMARY"

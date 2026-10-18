@@ -44,8 +44,9 @@ const fmt = (ms: number) => ms.toFixed(1);
 const rows: string[] = [];
 for (const k of [12, 14, 16, 17, 18, 19, 20]) {
   const input = worstCase(k);
-  const transfers = exactSettle(input).length;
-  const t = time(() => exactSettle(input), k <= 18 ? 30 : 10);
+  // Past MAX_EXACT_MEMBERS on purpose: the table shows why the cap is where it is.
+  const transfers = exactSettle(input, 20).length;
+  const t = time(() => exactSettle(input, 20), k <= 18 ? 30 : 10);
   rows.push(`| exact | ${k} | ${fmt(t.median)} | ${fmt(t.p95)} | ${fmt(t.max)} | ${transfers} |`);
 }
 for (const k of [100, 1000]) {
