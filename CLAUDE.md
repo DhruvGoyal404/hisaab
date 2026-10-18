@@ -14,7 +14,7 @@ Never use the name of the trademarked app this is modelled on in UI, repo, packa
 | Real-time (Phase 4) | Socket.IO, cookie-authenticated, server-assigned group rooms | shares 8081 |
 | Auth (Phase 6) | Google OIDC (code + PKCE, `openid email profile`, require `email_verified`) and GitHub sign-in; server-side sessions | |
 
-The audit and the full design rationale (domain model, rounding rule, debt simplification, real-time consistency) are in [docs/AUDIT.md](docs/AUDIT.md).
+The audit and design rationale are in [docs/AUDIT.md](docs/AUDIT.md); the implemented schema in [docs/SCHEMA.md](docs/SCHEMA.md); settlement algorithms and their measured thresholds in [docs/ALGORITHMS.md](docs/ALGORITHMS.md).
 
 ## Commands
 
@@ -35,8 +35,8 @@ npm run test:int                 # API integration tests: creates, migrates and 
 |---|---|---|
 | 0 | Audit | AUDIT.md reviewed; stack, auth and legacy-code decisions made. **Done.** |
 | 1 | Foundations | Compose Postgres on 5434, API on 8081 and web on 5174 respond; CI green; no secrets in the repo; nothing collides with CodeJudge ports or project names |
-| 2 | Domain + ledger | Integration tests on real Postgres prove Σ balances = 0, UPDATE/DELETE on `activity_log` fails at the DB, another group's ids return 404, and a split sum ≠ total is rejected by the DB even if the app check is bypassed |
-| 3 | Simplification | Property tests (≥10k runs) pass; exact matches brute force for n ≤ 7; n = 20 benchmark recorded and greedy/exact threshold set from it |
+| 2 | Domain + ledger | Integration tests on real Postgres prove Σ balances = 0, UPDATE/DELETE on `activity_log` fails at the DB, another group's ids return 404, and a split sum ≠ total is rejected by the DB even if the app check is bypassed. **Done.** |
+| 3 | Simplification | Property tests (≥10k runs) pass; exact matches brute force for n ≤ 7; n = 20 benchmark recorded and greedy/exact threshold set from it. **Done** (see docs/ALGORITHMS.md). |
 | 4 | Real-time | Tests: non-member can't subscribe, bad Origin rejected, two clients converge after one misses N events while offline |
 | 5 | Frontend | Playwright e2e: create group → invite → add each split type → settle → balances reach zero in both browsers |
 | 6 | Auth + limits | Tests for rate limiting (429), Origin rejection, session revocation killing sockets, invite expiry; dev login refuses to start outside development/test |
@@ -45,7 +45,7 @@ npm run test:int                 # API integration tests: creates, migrates and 
 ## Invariants (do not break these)
 
 - **Money is BIGINT minor units (paise), never floats, anywhere.** DB columns are `bigint`; API JSON carries integers; amounts are parsed from decimal strings, never `parseFloat(x) * 100`. The frontend formats only at display time.
-- **One allocation function for all splits**, with a deterministic remainder rule (largest remainder; ties broken by `sha256(expense_id ‖ user_id)`). Shares always sum exactly to the total.
+- **One allocation function for all splits**, with a deterministic remainder rule (largest remainder; ties broken by `sha256(expense_id ‖ membership_id)`). Shares always sum exactly to the total.
 - **The activity log is append-only, enforced by the DB** (trigger plus REVOKE), not just by app code.
 - **Sessions are opaque tokens, stored hashed (SHA-256) at rest.** No JWT. HttpOnly cookie. **Origin check on every non-GET request.**
 - **Clients never write over the socket.** All writes go through REST; sockets only notify.
