@@ -1,4 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { parseCookie } from 'cookie';
+import type { Request, Response } from 'express';
 import type pg from 'pg';
 
 export const SESSION_COOKIE = 'hisaab_session';
@@ -44,4 +46,12 @@ export async function findSession(pool: pg.Pool, token: string): Promise<Session
 
 export async function revokeSession(pool: pg.Pool, token: string): Promise<void> {
   await pool.query('update sessions set revoked_at = now() where token_hash = $1 and revoked_at is null', [hashSessionToken(token)]);
+}
+
+export const sessionToken = (req: Request): string | undefined => parseCookie(req.get('cookie') ?? '')[SESSION_COOKIE];
+
+/** Issues a session for `userId` and sets its cookie (Secure outside development and test). */
+export async function startSession(pool: pg.Pool, req: Request, res: Response, userId: string, secure: boolean): Promise<void> {
+  const { token, expiresAt } = await createSession(pool, userId, req.get('user-agent'));
+  res.cookie(SESSION_COOKIE, token, { httpOnly: true, sameSite: 'lax', secure, path: '/', expires: expiresAt });
 }

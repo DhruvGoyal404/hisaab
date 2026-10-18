@@ -5,6 +5,7 @@ import type { Logger } from 'pino';
 import type { Config } from './config.js';
 import { devLoginRouter } from './devLogin.js';
 import { errorHandler, notFound } from './errors.js';
+import { oauthRouter } from './oauth/router.js';
 import { apiRoutes } from './routes.js';
 import { healthRouter } from './health.js';
 import { requireAllowedOrigin } from './origin.js';
@@ -21,6 +22,7 @@ export function createApp({ config, logger, pool }: AppDeps): Express {
 
   const api = express.Router();
   api.use(healthRouter(pool));
+  api.use(oauthRouter(pool, config, logger));
   api.use(apiRoutes(pool));
   if (config.devLogin) {
     logger.warn('dev login enabled: anyone can sign in as any name');
