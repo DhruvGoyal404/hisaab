@@ -5,9 +5,13 @@
   "type": "module",
   "description": "Money in integer paise: the one allocation function, parsing and formatting. Shared by api and web.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "hisaab-dist": "./dist/index.js",
+      "default": "./src/index.ts"
+    }
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -1,0 +1,23 @@
+# Allow-list: the build context holds only what the images are built from. Everything else
+# (.env files, node_modules, dist, .git, test output) can never reach an image.
+*
+!package.json
+!package-lock.json
+!.npmrc
+!packages/money/package.json
+!packages/money/tsconfig.json
+!packages/money/tsconfig.build.json
+!packages/money/src/
+!api/package.json
+!api/tsconfig.json
+!api/tsconfig.build.json
+!api/src/
+!web/package.json
+!web/tsconfig.json
+!web/index.html
+!web/vite.config.ts
+!web/src/
+!web/Caddyfile
+!db/migrations/
+**/*.test.ts
+**/*.test.tsx

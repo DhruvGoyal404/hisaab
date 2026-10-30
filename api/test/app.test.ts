@@ -43,7 +43,8 @@ describe('error handling', () => {
       expect(res.headers['x-content-type-options']).toBe('nosniff');
       expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
       expect(res.headers['referrer-policy']).toBe('no-referrer');
-      expect(res.headers['strict-transport-security']).toMatch(/max-age=\d+/);
+      // No includeSubDomains: other dhruvgoyal.tech hosts are not this app's to decide.
+      expect(res.headers['strict-transport-security']).toBe('max-age=31536000');
       expect(res.headers['cross-origin-opener-policy']).toBe('same-origin');
       expect(res.headers['cross-origin-resource-policy']).toBe('same-origin');
     }

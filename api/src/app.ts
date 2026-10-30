@@ -20,7 +20,11 @@ export function createApp({ config, logger, pool, rateLimits = createRateLimits(
   if (config.trustProxy > 0) app.set('trust proxy', config.trustProxy);
   // helmet's defaults (nosniff, frame and referrer policies, HSTS, COOP/CORP, ...). The API only
   // ever answers with JSON, so its own CSP can forbid everything; the page CSP comes with deploy.
-  app.use(helmet({ contentSecurityPolicy: { useDefaults: false, directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } } }));
+  // HSTS without includeSubDomains: other dhruvgoyal.tech hosts are not this app's to decide.
+  app.use(helmet({
+    contentSecurityPolicy: { useDefaults: false, directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
+    strictTransportSecurity: { maxAge: 31_536_000, includeSubDomains: false },
+  }));
 
   app.use(pinoHttp({ logger }));
   app.use(requireAllowedOrigin(config.webOrigins));
