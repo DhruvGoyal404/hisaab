@@ -130,12 +130,11 @@ fake_up_host() { export FAKE_PIP=1 FAKE_POWER=running; }
 fake_down_host() { export FAKE_PIP='' FAKE_POWER=deallocated; }
 
 # -- Preflight ------------------------------------------------------------------------------------
-# Only these tools on the PATH. lib.sh defines az and jq as functions, so its own check for them
-# always passes: a missing curl is what it names, a missing az stops at the first call.
+# Only these tools on the PATH, less the one left out.
 without() { # <tool to leave out>: runs hisaab-up.sh, sets $out and $code
   local tools t
   tools=$(mktemp -d "$bin/tools.XXXXXX")
-  for t in dirname curl tr; do
+  for t in dirname az jq curl tr; do
     [[ $t == "$1" ]] || ln -s "$(PATH=$bin:$PATH command -v "$t")" "$tools/$t"
   done
   set +e
@@ -143,10 +142,10 @@ without() { # <tool to leave out>: runs hisaab-up.sh, sets $out and $code
   code=$?
   set -e
 }
-without curl
-[[ $code -ne 0 ]] && said "'curl' is not installed" || fail "with no curl it exited $code"
-without az
-[[ $code -ne 0 ]] && said 'az: command not found' || fail "with no az it exited $code"
+for tool in az jq curl; do
+  without "$tool"
+  [[ $code -ne 0 ]] && said "'$tool' is not installed" || fail "with no $tool it exited $code"
+done
 out=''
 echo "ok   preflight: a missing tool stops it"
 
