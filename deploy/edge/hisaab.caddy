@@ -1,0 +1,34 @@
+# Hisaab's site on the shared edge Caddy (Chitthi's deploy/edge: its Caddyfile imports
+# /etc/caddy/sites/*.caddy). Installed as /srv/edge/sites/hisaab.caddy by Hisaab's deploy only,
+# after validating it against the whole edge configuration; no other app's file is ever touched.
+# /api/* (REST and the Socket.IO WebSocket at /api/socket.io) to the API, everything else to the
+# web container. Both listen on loopback only (deploy/hisaab/compose.yaml).
+# The page's own headers (CSP with frame-ancestors, nosniff, DENY) come from the web image, and the
+# API's from helmet; this file adds only what belongs to the HTTPS edge.
+hisaab.dhruvgoyal.tech {
+	header {
+		# No includeSubDomains: other dhruvgoyal.tech hosts are not this app's to decide.
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+
+	# Hisaab takes only small JSON bodies (the API's own cap is 100 kB).
+	request_body {
+		max_size 1MB
+	}
+
+	handle /api/* {
+		# Caddy replaces any X-Forwarded-For a client sends with the real peer address, and the API
+		# trusts exactly one proxy hop (TRUST_PROXY=1), so rate limits see the client's IP.
+		reverse_proxy 127.0.0.1:8081
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:5174
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

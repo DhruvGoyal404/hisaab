@@ -1,0 +1,141 @@
+# Hisaab in production: Postgres, the API and the static web app, behind the shared edge Caddy
+# (Chitthi's deploy/edge, one site file per app). Lives in /srv/hisaab on the VM; data lives on the
+# data disk under /data/hisaab.
+#
+# Files next to this one (written by the deploy script, never committed):
+#   .env         image references by digest, HISAAB_DATA. No secrets: `compose config` prints it.
+#   db.env       POSTGRES_PASSWORD (the owner's)
+#   migrate.env  MIGRATE_DATABASE_URL (owner), DATABASE_URL (hisaab_api)
+#   api.env      DATABASE_URL (hisaab_api), GOOGLE_*/GITHUB_* client ids and secrets
+# Each container gets only its own secrets: the API never sees the owner's password.
+#
+# Host uids, Hisaab's own range (Chitthi has 10010-10011, the edge 10002):
+#   10020 hisaab      the API and the migrate job
+#   10021 hisaab-db   Postgres; owns /data/hisaab/pg
+#   10022             the web image's Caddy (inside the image; it owns no host files)
+#
+# Memory limits: docs/PHASE7-PLAN.md section 4 until measured (docs/MAINTENANCE.md, "Memory
+# budget"). A container that overruns its limit is killed and restarted on its own; the host and
+# the other app keep running. The HISAAB_*_MEM overrides exist for measuring, not for production.
+name: hisaab
+
+x-hardened: &hardened
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  restart: unless-stopped
+  logging:
+    driver: local
+    options: { max-size: 10m, max-file: "3" }
+
+services:
+  db:
+    <<: *hardened
+    # postgres 18.6 on Alpine 3.24 (pushed 2026-09-21): the digest Chitthi runs, so the VM shares it.
+    image: postgres:18.6-alpine3.24@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    # Started directly as its own uid on a data directory the deploy already owns to it, so the
+    # entrypoint has nothing to chown and needs no capabilities at all.
+    user: "10021:10021"
+    env_file: [db.env]
+    environment:
+      POSTGRES_USER: hisaab
+      POSTGRES_DB: hisaab
+    # Small on purpose: a few users on a 1 GB VM shared with Chitthi. No parallel query, no JIT;
+    # 20 connections cover the API's pool of 10, its LISTEN client, migrations and pg_dump.
+    command:
+      - postgres
+      - -c
+      - shared_buffers=24MB
+      - -c
+      - effective_cache_size=96MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=16MB
+      - -c
+      - max_connections=20
+      - -c
+      - max_worker_processes=4
+      - -c
+      - max_parallel_workers=0
+      - -c
+      - max_parallel_workers_per_gather=0
+      - -c
+      - autovacuum_max_workers=2
+      - -c
+      - jit=off
+      - -c
+      - huge_pages=off
+      - -c
+      - max_wal_size=256MB
+    volumes:
+      - ${HISAAB_DATA:-/data/hisaab}/pg:/var/lib/postgresql
+    tmpfs:
+      - /var/run/postgresql
+      - /tmp
+    shm_size: 32m
+    mem_limit: ${HISAAB_DB_MEM:-128m}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hisaab -d hisaab"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # One-off, before the API starts on new code: `docker compose run --rm migrate`.
+  migrate:
+    <<: *hardened
+    image: ${HISAAB_MIGRATE_IMAGE:?set HISAAB_MIGRATE_IMAGE}
+    restart: "no"
+    profiles: [migrate]
+    user: "10020:10020"
+    env_file: [migrate.env]
+    mem_limit: 128m
+    networks: [backend]
+    depends_on:
+      db: { condition: service_healthy }
+
+  api:
+    <<: *hardened
+    image: ${HISAAB_API_IMAGE:?set HISAAB_API_IMAGE}
+    user: "10020:10020"
+    env_file: [api.env]
+    # Pinned here, not in the secret store: `environment` wins over `env_file`, so editing api.env
+    # can't change these (api/test/production.test.ts proves dev switches are refused anyway).
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8081"
+      WEB_ORIGINS: ${HISAAB_ORIGIN:-https://hisaab.dhruvgoyal.tech}
+      PUBLIC_URL: ${HISAAB_ORIGIN:-https://hisaab.dhruvgoyal.tech}
+      TRUST_PROXY: "1"
+      LOG_LEVEL: info
+      # No image work in Hisaab: Node's baseline plus a 96 MiB heap leaves room under the limit,
+      # so V8 collects before the cgroup would kill.
+      NODE_OPTIONS: --max-old-space-size=${HISAAB_API_HEAP_MB:-96}
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:8081:8081"
+    mem_limit: ${HISAAB_API_MEM:-192m}
+    stop_grace_period: 15s
+    # backend: Postgres. egress: the OAuth providers (Google, GitHub) and the published port.
+    networks: [backend, egress]
+    depends_on:
+      db: { condition: service_healthy }
+
+  web:
+    <<: *hardened
+    image: ${HISAAB_WEB_IMAGE:?set HISAAB_WEB_IMAGE}
+    tmpfs:
+      - /tmp
+    ports:
+      - "127.0.0.1:5174:5174"
+    mem_limit: ${HISAAB_WEB_MEM:-32m}
+    networks: [egress]
+
+networks:
+  # No route out: Postgres is reachable only from the API and the migrate job.
+  backend:
+    internal: true
+  egress: {}

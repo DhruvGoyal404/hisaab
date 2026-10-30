@@ -94,3 +94,43 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH="$PWD/.playwright" npx playwright install --with-deps chromium
       - name: End-to-end tests (own throwaway database)
         run: npm run e2e -w web
+
+  # The production images (api/Dockerfile, web/Dockerfile), checked on their own (non-root,
+  # read-only, no capabilities, config refusal, the page's headers and routing), then as the
+  # production stack behind the edge with TLS (deploy/smoke/smoke.sh: refusals, the workload, and
+  # the MEMORY table, failing on an OOM kill or a container within 10 % of its limit).
+  # Its own job: the smoke test needs ports 80/443/8081/5174 and no Postgres on the host.
+  # Publishing comes with the deploy workflow, which deploys only when this job passed.
+  images:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash # -eo pipefail
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Shellcheck
+        run: shellcheck scripts/*.sh deploy/smoke/smoke.sh
+      - name: Vendored files match Chitthi
+        run: scripts/check-vendored.sh
+      - name: Build the API image
+        run: docker build -f api/Dockerfile --target api -t hisaab-api:ci .
+      - name: Build the migrate image
+        run: docker build -f api/Dockerfile --target migrate -t hisaab-migrate:ci .
+      - name: Build the web image
+        run: docker build -f web/Dockerfile -t hisaab-web:ci .
+      - name: Check the images
+        run: scripts/check-images.sh hisaab-api:ci hisaab-migrate:ci hisaab-web:ci
+      - name: Image sizes
+        run: docker image ls --format '{{.Repository}}:{{.Tag}} {{.Size}}' | grep ':ci '
+      # The smoke workload runs on the runner with the repo's socket.io-client.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Smoke-test and measure the production stack
+        run: deploy/smoke/smoke.sh hisaab-api:ci hisaab-migrate:ci hisaab-web:ci
