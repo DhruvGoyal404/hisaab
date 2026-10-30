@@ -116,7 +116,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Shellcheck
-        run: shellcheck scripts/*.sh deploy/smoke/smoke.sh deploy/host/*.sh
+        run: shellcheck -x hisaab-up.sh hisaab-down.sh scripts/*.sh deploy/smoke/smoke.sh deploy/host/*.sh deploy/azure/*.sh
+      - name: hisaab-down.sh leaves a VM another app needs alone
+        run: scripts/test-down.sh
       - name: Vendored files match Chitthi
         run: scripts/check-vendored.sh
       - name: Build the API image

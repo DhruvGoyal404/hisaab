@@ -15,7 +15,7 @@ Never use the name of the trademarked app this is modelled on in UI, repo, packa
 | Real-time (Phase 4) | Socket.IO, cookie-authenticated, server-assigned group rooms | shares 8081 |
 | Auth (Phase 6) | Google OIDC (code + PKCE, `openid email profile`, require `email_verified`) and GitHub sign-in; server-side sessions | |
 
-The audit and design rationale are in [docs/AUDIT.md](docs/AUDIT.md); the implemented schema in [docs/SCHEMA.md](docs/SCHEMA.md); settlement algorithms and their measured thresholds in [docs/ALGORITHMS.md](docs/ALGORITHMS.md); the real-time design in [docs/REALTIME.md](docs/REALTIME.md).
+Running it in production: [docs/MAINTENANCE.md](docs/MAINTENANCE.md). The audit and design rationale are in [docs/AUDIT.md](docs/AUDIT.md); the implemented schema in [docs/SCHEMA.md](docs/SCHEMA.md); settlement algorithms and their measured thresholds in [docs/ALGORITHMS.md](docs/ALGORITHMS.md); the real-time design in [docs/REALTIME.md](docs/REALTIME.md).
 
 ## Commands
 

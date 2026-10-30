@@ -108,7 +108,7 @@ The 2 GB swap means an overrun first slows the VM rather than killing it. A cont
 ## 5. Manual steps (yours)
 
 1. **DNS:** nothing by hand. `hisaab-up.sh` creates and updates the `hisaab.dhruvgoyal.tech` A record through Cloudflare's API, the same way as Chitthi. It needs a Cloudflare API token (Zone Read and DNS Edit on `dhruvgoyal.tech`). You can reuse Chitthi's token value or make a new one.
-2. **Remove the old CNAME** `splitwise.dhruvgoyal.tech` in Cloudflare (trademark).
+2. **Remove the old CNAME** for the legacy subdomain in Cloudflare (it carries the trademarked name).
 3. **Production OAuth apps** (separate from the dev ones):
    - **Google:** a new OAuth client in a project whose consent screen has the homepage `https://hisaab.dhruvgoyal.tech`, the privacy and terms URLs (`/privacy`, `/terms`), scopes `openid email profile`, publishing status "In production". Redirect URI `https://hisaab.dhruvgoyal.tech/api/auth/google/callback`.
    - **GitHub:** a new OAuth app with homepage `https://hisaab.dhruvgoyal.tech` and callback `https://hisaab.dhruvgoyal.tech/api/auth/github/callback`.

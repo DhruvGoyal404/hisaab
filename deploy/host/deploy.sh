@@ -56,8 +56,9 @@ trap 'rm -rf -- "$work"' EXIT
 # packages:read) in HISAAB_GITHUB_TOKEN; GitHub revokes it when that job ends, minutes from now.
 # It stays in a 0600 header file and a throwaway Docker config, both under $work, and never on a
 # command line. Without it, files and images are fetched anonymously (a public repo).
-gh_token=${HISAAB_GITHUB_TOKEN:-}
-unset HISAAB_GITHUB_TOKEN
+# run-on-vm.sh is vendored from Chitthi, so on the VM it arrives under that name.
+gh_token=${HISAAB_GITHUB_TOKEN:-${CHITTHI_GITHUB_TOKEN:-}}
+unset HISAAB_GITHUB_TOKEN CHITTHI_GITHUB_TOKEN
 if [[ -n $gh_token ]]; then
   [[ $gh_token =~ ^[A-Za-z0-9_.-]{20,}$ ]] || die "HISAAB_GITHUB_TOKEN does not look like a GitHub token"
   printf 'Authorization: Bearer %s\n' "$gh_token" > "$work/gh-auth"
