@@ -69,11 +69,11 @@ export function BalanceWords({ paise, self = false }: { paise: number; self?: bo
   );
 }
 
-/** Hisaab barabar: the account is closed. */
-export function Stamp({ label = 'all square', animate = false }: { label?: string; animate?: boolean }) {
+/** The ledger's ink stamp. By default hisaab barabar: the account is closed. */
+export function Stamp({ word = 'बराबर', label = 'all square', animate = false }: { word?: string; label?: string; animate?: boolean }) {
   return (
-    <span className={`stamp ${animate ? 'stamp-in' : ''}`} role="img" aria-label={`बराबर, ${label}`}>
-      <span className="font-display text-2xl" lang="hi" aria-hidden="true">बराबर</span>
+    <span className={`stamp ${animate ? 'stamp-in' : ''}`} role="img" aria-label={`${word}, ${label}`}>
+      <span className="font-display text-2xl" lang="hi" aria-hidden="true">{word}</span>
       <span className="text-sm font-semibold" aria-hidden="true">{label}</span>
     </span>
   );

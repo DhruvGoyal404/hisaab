@@ -31,7 +31,7 @@ for (const scheme of ['light', 'dark'] as const) {
       await expectAccessible(signIn, 'sign in');
       await signIn.getByRole('button', { name: 'Sign in' }).click(); // with its error showing
       await expectAccessible(signIn, 'sign in, error');
-      for (const path of ['/privacy', '/terms']) {
+      for (const path of ['/privacy', '/terms', '/no/such/page']) {
         await signIn.goto(path);
         await expectAccessible(signIn, path);
       }
@@ -39,6 +39,12 @@ for (const scheme of ['light', 'dark'] as const) {
 
       await page.goto('/');
       await expectAccessible(page, 'home');
+
+      await page.route('**/AccountPage*', (r) => r.abort()); // a chunk that won't load
+      await page.goto('/account');
+      await expect(page.getByRole('heading', { name: 'Something went wrong' })).toBeVisible();
+      await expectAccessible(page, 'error page');
+      await page.unroute('**/AccountPage*');
 
       for (const tab of size === 'phone' ? ['activity', 'balances', 'settle', 'members'] : ['activity']) {
         await page.goto(`/groups/${groupId}?tab=${tab}`);

@@ -8,6 +8,7 @@ import { RequireAuth } from './lib/auth';
 import { GroupPage } from './pages/group/GroupPage';
 import { HomePage } from './pages/HomePage';
 import { SignInPage } from './pages/SignInPage';
+import { NotFoundPage, RootBoundary, RouteError } from './pages/StatusPages';
 import { RealtimeProvider } from './realtime/RealtimeProvider';
 
 const queryClient = new QueryClient({
@@ -24,23 +25,29 @@ const expensePages = () => import('./pages/expense/ExpensePages');
 const legalPages = () => import('./pages/LegalPages');
 
 const router = createBrowserRouter([
-  { path: '/signin', element: <SignInPage /> },
   {
-    element: <RequireAuth><Outlet /></RequireAuth>,
+    errorElement: <RouteError />,
     children: [
-      { path: '/', element: <HomePage /> },
-      { path: '/groups/:groupId', element: <GroupPage /> },
-      { path: '/groups/:groupId/expenses/new', lazy: async () => ({ Component: (await expensePages()).NewExpensePage }) },
-      { path: '/groups/:groupId/expenses/:expenseId', lazy: async () => ({ Component: (await expensePages()).ExpensePage }) },
-      { path: '/groups/:groupId/expenses/:expenseId/edit', lazy: async () => ({ Component: (await expensePages()).EditExpensePage }) },
-      { path: '/groups/:groupId/settle', lazy: async () => ({ Component: (await import('./pages/SettleUpPage')).SettleUpPage }) },
-      { path: '/account', lazy: async () => ({ Component: (await import('./pages/AccountPage')).AccountPage }) },
-      { path: '/join/:token', lazy: async () => ({ Component: (await import('./pages/JoinPage')).JoinPage }) },
+      { path: '/signin', element: <SignInPage /> },
+      {
+        element: <RequireAuth><Outlet /></RequireAuth>,
+        children: [
+          { path: '/', element: <HomePage /> },
+          { path: '/groups/:groupId', element: <GroupPage /> },
+          { path: '/groups/:groupId/expenses/new', lazy: async () => ({ Component: (await expensePages()).NewExpensePage }) },
+          { path: '/groups/:groupId/expenses/:expenseId', lazy: async () => ({ Component: (await expensePages()).ExpensePage }) },
+          { path: '/groups/:groupId/expenses/:expenseId/edit', lazy: async () => ({ Component: (await expensePages()).EditExpensePage }) },
+          { path: '/groups/:groupId/settle', lazy: async () => ({ Component: (await import('./pages/SettleUpPage')).SettleUpPage }) },
+          { path: '/account', lazy: async () => ({ Component: (await import('./pages/AccountPage')).AccountPage }) },
+          { path: '/join/:token', lazy: async () => ({ Component: (await import('./pages/JoinPage')).JoinPage }) },
+        ],
+      },
+      { path: '/privacy', lazy: async () => ({ Component: (await legalPages()).PrivacyPage }) },
+      { path: '/terms', lazy: async () => ({ Component: (await legalPages()).TermsPage }) },
+      { path: '/status', lazy: async () => ({ Component: (await import('./pages/HealthPage')).HealthPage }) },
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
-  { path: '/privacy', lazy: async () => ({ Component: (await legalPages()).PrivacyPage }) },
-  { path: '/terms', lazy: async () => ({ Component: (await legalPages()).TermsPage }) },
-  { path: '/status', lazy: async () => ({ Component: (await import('./pages/HealthPage')).HealthPage }) },
 ]);
 
 const root = document.getElementById('root');
@@ -48,10 +55,12 @@ if (!root) throw new Error('#root missing from index.html');
 
 createRoot(root).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RealtimeProvider>
-        <RouterProvider router={router} />
-      </RealtimeProvider>
-    </QueryClientProvider>
+    <RootBoundary>
+      <QueryClientProvider client={queryClient}>
+        <RealtimeProvider>
+          <RouterProvider router={router} />
+        </RealtimeProvider>
+      </QueryClientProvider>
+    </RootBoundary>
   </StrictMode>,
 );
