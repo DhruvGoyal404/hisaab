@@ -18,6 +18,7 @@
   --band: #a3122a; /* the ledger cover: header band */
   --band-ink: #ffffff;
   --thread: #e8a80c; /* marigold stitching: decoration only, never text */
+  --live: #4ade80; /* connection dot on the band */
   --accent: #a3122a; /* primary buttons */
   --accent-ink: #ffffff;
   --owe: #a3122a;
@@ -41,6 +42,7 @@
     --band: #6e0c1f;
     --band-ink: #fff3f5;
     --thread: #c98f0a;
+    --live: #4ade80;
     --accent: #ff8a96;
     --accent-ink: #16142a;
     --owe: #ff9aa5;
@@ -65,6 +67,7 @@
   --color-band: var(--band);
   --color-band-ink: var(--band-ink);
   --color-thread: var(--thread);
+  --color-live: var(--live);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-owe: var(--owe);

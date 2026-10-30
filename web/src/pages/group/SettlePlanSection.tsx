@@ -50,12 +50,12 @@ export function SettlePlanSection({ group }: { group: GroupDetail }) {
           </p>
           <ul className="ledger">
             {transfers.map((t) => (
-              <li key={`${t.from}-${t.to}`} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-3">
-                <span className="min-w-0">
-                  <span className="font-semibold">{cap(nameOf(t.from))}</span> {t.from === group.me.memberId ? 'pay' : 'pays'}{' '}
-                  <span className="font-semibold">{nameOf(t.to)}</span>
+              <li key={`${t.from}-${t.to}`} className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                  <span className="inline-block font-semibold">{cap(nameOf(t.from))}</span> {t.from === group.me.memberId ? 'pay' : 'pays'}{' '}
+                  <span className="inline-block font-semibold">{nameOf(t.to)}</span>
                 </span>
-                <span className="flex items-center gap-3">
+                <span className="flex shrink-0 items-center gap-3">
                   <Money paise={t.amountMinor} className="font-semibold" />
                   <Link
                     to={`/groups/${group.groupId}/settle?from=${t.from}&to=${t.to}&amount=${t.amountMinor}`}

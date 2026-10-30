@@ -101,8 +101,8 @@ export function SettleUpPage() {
                     className="flex min-h-12 w-full items-center justify-between gap-3 py-2 text-left hover:bg-sheet"
                     onClick={() => { setFrom(t.from); setTo(t.to); setAmount(formatPaise(t.amountMinor).replace(/^₹/, '')); }}
                   >
-                    <span><span className="font-semibold">{nameOf(t.from)}</span> pays <span className="font-semibold">{nameOf(t.to)}</span></span>
-                    <Money paise={t.amountMinor} className="font-semibold" />
+                    <span className="min-w-0 flex-1 [overflow-wrap:anywhere]"><span className="inline-block font-semibold">{nameOf(t.from)}</span> pays <span className="inline-block font-semibold">{nameOf(t.to)}</span></span>
+                    <Money paise={t.amountMinor} className="shrink-0 font-semibold" />
                   </button>
                 </li>
               ))}

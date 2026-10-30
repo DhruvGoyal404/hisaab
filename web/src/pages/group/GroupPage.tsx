@@ -44,7 +44,7 @@ export function GroupPage() {
       }
       actions={
         <div className="hidden gap-2 lg:flex">
-          <Link to={settleUp} className={`${btn.secondary} border-band-ink text-band-ink hover:bg-transparent`}>Settle up</Link>
+          <Link to={settleUp} className="inline-flex min-h-11 items-center rounded border-2 border-band-ink px-4 font-semibold text-band-ink hover:bg-band-ink/15">Settle up</Link>
           <Link to={addExpense} className="inline-flex min-h-11 items-center rounded bg-page px-4 font-semibold text-ink">Add expense</Link>
         </div>
       }
