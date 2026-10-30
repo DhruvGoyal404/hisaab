@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fails if any vendored file differs from Chitthi at the pinned commit (deploy/VENDORED.md).
 set -euo pipefail
-COMMIT=55fbf40166438896581aa6b0782539eaf629678d
+COMMIT=fafd9c28b0426d4b7f861c1b022fdf26db6f8760
 FILES=(deploy/edge/compose.yaml deploy/edge/Caddyfile deploy/host/edge.sh deploy/azure/lib.sh deploy/azure/host-up.sh deploy/azure/host-down.sh deploy/azure/audit.jq deploy/azure/run-on-vm.sh deploy/azure/age_keypair.py) # same path in both repos
 cd "$(dirname "$0")/.."
 grep -qF "$COMMIT" deploy/VENDORED.md || { echo "FAIL: deploy/VENDORED.md does not name $COMMIT"; exit 1; }

@@ -5,7 +5,7 @@ The shared host (the VM `apps-vm` and its edge Caddy) is defined in
 the files it needs, pinned to one Chitthi commit, so its scripts never depend on the other repo at
 run time (docs/PHASE7-PLAN.md, section 2).
 
-Pinned commit: `55fbf40166438896581aa6b0782539eaf629678d` (head of chitthi#1; after that PR merges, pin the merge commit: the files are the same)
+Pinned commit: `fafd9c28b0426d4b7f861c1b022fdf26db6f8760` (chitthi#1, squash-merged)
 
 | Here | In Chitthi |
 |---|---|
