@@ -119,6 +119,8 @@ jobs:
         run: shellcheck -x hisaab-up.sh hisaab-down.sh scripts/*.sh deploy/smoke/smoke.sh deploy/host/*.sh deploy/azure/*.sh
       - name: hisaab-down.sh leaves a VM another app needs alone
         run: scripts/test-down.sh
+      - name: hisaab-up.sh, on fake Azure, Cloudflare and monitors
+        run: scripts/test-up.sh
       - name: Vendored files match Chitthi
         run: scripts/check-vendored.sh
       - name: Build the API image
