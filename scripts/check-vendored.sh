@@ -2,7 +2,7 @@
 # Fails if any vendored file differs from Chitthi at the pinned commit (deploy/VENDORED.md).
 set -euo pipefail
 COMMIT=4b24b49eb2047f3a85e4b434718176ccdd5c08b9
-FILES=(deploy/edge/compose.yaml deploy/edge/Caddyfile) # same path in both repos
+FILES=(deploy/edge/compose.yaml deploy/edge/Caddyfile deploy/host/edge.sh) # same path in both repos
 cd "$(dirname "$0")/.."
 grep -qF "$COMMIT" deploy/VENDORED.md || { echo "FAIL: deploy/VENDORED.md does not name $COMMIT"; exit 1; }
 for f in "${FILES[@]}"; do

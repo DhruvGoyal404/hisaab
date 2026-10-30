@@ -105,6 +105,9 @@ jobs:
     needs: check
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: read # test-deploy.sh signs in to ghcr.io with this token, as the VM does
     defaults:
       run:
         shell: bash # -eo pipefail
@@ -113,7 +116,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Shellcheck
-        run: shellcheck scripts/*.sh deploy/smoke/smoke.sh
+        run: shellcheck scripts/*.sh deploy/smoke/smoke.sh deploy/host/*.sh
       - name: Vendored files match Chitthi
         run: scripts/check-vendored.sh
       - name: Build the API image
@@ -134,3 +137,7 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Smoke-test and measure the production stack
         run: deploy/smoke/smoke.sh hisaab-api:ci hisaab-migrate:ci hisaab-web:ci
+      - name: Deploy, re-deploy, a broken deploy that rolls itself back, explicit rollback
+        env:
+          HISAAB_TEST_GITHUB_TOKEN: ${{ github.token }}
+        run: deploy/host/test-deploy.sh

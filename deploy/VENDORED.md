@@ -11,6 +11,7 @@ Pinned commit: `4b24b49eb2047f3a85e4b434718176ccdd5c08b9`
 |---|---|
 | `deploy/edge/compose.yaml` | `deploy/edge/compose.yaml` |
 | `deploy/edge/Caddyfile` | `deploy/edge/Caddyfile` |
+| `deploy/host/edge.sh` | `deploy/host/edge.sh` (only `test-deploy.sh` runs it; on the VM the edge is Chitthi's to install) |
 
 CI (`images` job, "Vendored files match Chitthi") fetches each file at the pinned commit and fails
 on any difference. To update: change the commit above and in `scripts/check-vendored.sh`, copy the
@@ -18,3 +19,6 @@ files again, and let CI confirm.
 
 Hisaab's own files next to them are not vendored: `deploy/edge/hisaab.caddy` is Hisaab's site file,
 installed on the VM as `/srv/edge/sites/hisaab.caddy` by Hisaab's deploy only.
+
+`deploy/host/deploy.sh` and `test-deploy.sh` are adapted, not vendored: the same design with
+Hisaab's names, its own users and folders, and no `CHITTHI_*` settings.

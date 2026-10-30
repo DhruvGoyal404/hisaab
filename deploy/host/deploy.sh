@@ -1,0 +1,326 @@
+#!/usr/bin/env bash
+# Deploys a CI-built release of Hisaab on the VM, rolls it back, or smoke-tests what is running.
+# Runs as root through Azure Run Command (the deploy workflow sends this file):
+#
+#   deploy.sh deploy sha=<git sha> api=<image@digest> migrate=<image@digest> web=<image@digest> \
+#                    vault=<key vault name>
+#   deploy.sh rollback      back to the release before the current one (images only)
+#   deploy.sh smoke         check what is running, through the edge and the public hostname
+#
+# Adapted from Chitthi's deploy/host/deploy.sh (deploy/VENDORED.md).
+#
+# deploy: create Hisaab's users and folders if new (the host's bootstrap knows only Chitthi's); fetch
+# Hisaab's compose file and its site file at <sha>; check the site file against the
+# whole edge configuration; write each container's env file from Key Vault (through the VM's
+# managed identity); pull by digest; dump the database; migrate; start; install the site file and
+# reload the edge; smoke-test. If anything fails after the switch, the previous release comes back
+# automatically and the script exits non-zero either way.
+#
+# The edge is shared. This script writes exactly one file there, /srv/edge/sites/hisaab.caddy;
+# the main Caddyfile, the edge's compose file and every other app's site file belong to others
+# (deploy/host/edge.sh, the other apps' deploys) and are never written here.
+#
+# Migrations are forward-only, so a rollback restores images, never the schema: every migration
+# must keep the previous release working (expand, then contract in a later release).
+set -euo pipefail
+umask 077
+
+REPO=DhruvGoyal404/hisaab
+HOST=hisaab.dhruvgoyal.tech
+ORIGIN=https://$HOST
+SRV=/srv/hisaab
+EDGE=/srv/edge
+SITE=$EDGE/sites/hisaab.caddy
+EDGE_UID=10002
+APP_UID=10020
+DB_UID=10021
+DATA=/data/hisaab
+DUMPS=$DATA/pre-deploy
+KEEP_DUMPS=5
+IMAGE_RE='^ghcr\.io/dhruvgoyal404/hisaab-(api|migrate|web)@sha256:[0-9a-f]{64}$'
+
+# CI only, never on the VM: local images and config, secrets from files, the edge's internal CA.
+TEST_CONFIG_DIR=${HISAAB_TEST_CONFIG_DIR:-}
+TEST_SECRETS_DIR=${HISAAB_TEST_SECRETS_DIR:-}
+TEST_CACERT=${HISAAB_TEST_CACERT:-}
+if [[ -n $TEST_CONFIG_DIR ]]; then IMAGE_RE='^hisaab-(api|migrate|web):[a-z0-9.-]+$'; fi
+
+log() { echo "deploy: $*"; }
+die() { echo "deploy: FAILED: $*" >&2; exit 1; }
+[[ $EUID -eq 0 ]] || die "run as root"
+
+work=$(mktemp -d /run/hisaab-deploy.XXXXXX)
+trap 'rm -rf -- "$work"' EXIT
+
+# GHCR packages stay private even in a public repo unless set otherwise. The deploy workflow hands over its own GITHUB_TOKEN (contents:read,
+# packages:read) in HISAAB_GITHUB_TOKEN; GitHub revokes it when that job ends, minutes from now.
+# It stays in a 0600 header file and a throwaway Docker config, both under $work, and never on a
+# command line. Without it, files and images are fetched anonymously (a public repo).
+gh_token=${HISAAB_GITHUB_TOKEN:-}
+unset HISAAB_GITHUB_TOKEN
+if [[ -n $gh_token ]]; then
+  [[ $gh_token =~ ^[A-Za-z0-9_.-]{20,}$ ]] || die "HISAAB_GITHUB_TOKEN does not look like a GitHub token"
+  printf 'Authorization: Bearer %s\n' "$gh_token" > "$work/gh-auth"
+fi
+fetch() { # <path in the repo> <sha> <output file>
+  if [[ -f $work/gh-auth ]]; then
+    curl -fsSL --proto '=https' --max-time 30 -o "$3" -H @"$work/gh-auth" -H 'Accept: application/vnd.github.raw' \
+      "https://api.github.com/repos/$REPO/contents/$1?ref=$2"
+  else
+    curl -fsSL --proto '=https' --max-time 30 -o "$3" "https://raw.githubusercontent.com/$REPO/$2/$1"
+  fi
+}
+
+app() { docker compose -p hisaab --project-directory "$SRV" -f "$SRV/compose.yaml" "$@"; }
+edge() { docker compose -p edge --project-directory "$EDGE" -f "$EDGE/compose.yaml" "$@"; }
+
+# --- Smoke: the public hostname, resolved to this machine, through the edge and real TLS.
+smoke() {
+  local c=(curl -sS --max-time 10 --resolve "$HOST:443:127.0.0.1" --resolve "$HOST:80:127.0.0.1")
+  [[ -n $TEST_CACERT ]] && c+=(--cacert "$TEST_CACERT")
+  local i out code headers
+  for i in $(seq 1 30); do
+    out=$("${c[@]}" "https://$HOST/api/health" 2>/dev/null || true)
+    [[ $out == '{"status":"ok","db":"ok"}' ]] && break
+    [[ $i -eq 30 ]] && { echo "smoke: health never became ok (last: ${out:-no answer})"; return 1; }
+    sleep 2
+  done
+  echo "ok   health: API and database"
+  headers=$("${c[@]}" -D - -o /dev/null "https://$HOST/signin")
+  grep -qi '^HTTP/[0-9.]* 200' <<<"$headers" || { echo "smoke: the page did not answer 200"; return 1; }
+  grep -qi "^content-security-policy: .*frame-ancestors 'none'" <<<"$headers" || { echo "smoke: the page has no CSP"; return 1; }
+  grep -qi '^strict-transport-security: max-age=' <<<"$headers" || { echo "smoke: no HSTS"; return 1; }
+  echo "ok   page: app shell, CSP, HSTS"
+  code=$("${c[@]}" -o /dev/null -w '%{http_code} %{redirect_url}' "http://$HOST/")
+  [[ $code == "308 https://$HOST/" ]] || { echo "smoke: plain HTTP got '$code', not a redirect to HTTPS"; return 1; }
+  out=$("${c[@]}" -H "Origin: $ORIGIN" "https://$HOST/api/socket.io/?EIO=4&transport=polling")
+  [[ $out == 0\{* ]] || { echo "smoke: no Socket.IO handshake for the app's own Origin"; return 1; }
+  code=$("${c[@]}" -o /dev/null -w '%{http_code}' -H 'Origin: https://evil.example' "https://$HOST/api/socket.io/?EIO=4&transport=polling")
+  [[ $code == 403 ]] || { echo "smoke: a foreign Origin's Socket.IO handshake got $code"; return 1; }
+  code=$("${c[@]}" -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "https://$HOST/api/auth/logout")
+  [[ $code == 403 ]] || { echo "smoke: a POST without Origin got $code"; return 1; }
+  code=$("${c[@]}" -o /dev/null -w '%{http_code}' -X POST -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -d '{}' "https://$HOST/api/dev/login")
+  [[ $code == 404 ]] || { echo "smoke: the dev sign-in answered $code"; return 1; }
+  echo "ok   Socket.IO handshake; foreign Origin and Origin-less POST refused; no dev sign-in"
+}
+
+# --- Rollback: the previous release's image references and compose file, no migrations.
+rollback() {
+  [[ -f $SRV/.env.previous && -f $SRV/compose.yaml.previous ]] || die "there is no previous release to roll back to"
+  log "rolling back to $(grep -h '^HISAAB_API_IMAGE=' "$SRV/.env.previous" | cut -d= -f2-)"
+  cp "$SRV/.env" "$SRV/.env.failed" && cp "$SRV/compose.yaml" "$SRV/compose.yaml.failed"
+  cp "$SRV/.env.previous" "$SRV/.env" && cp "$SRV/compose.yaml.previous" "$SRV/compose.yaml"
+  # Called where set -e doesn't reach (if, ||), so every step returns its failure explicitly.
+  app up -d --wait --remove-orphans db api web || return 1
+  smoke
+}
+
+record() { printf '%s %s %s\n' "$(date -u +%FT%TZ)" "$1" "$2" >> "$SRV/deploys.log"; }
+
+case ${1:-} in
+  smoke) smoke; exit ;;
+  rollback)
+    exec 9>/run/hisaab-deploy.lock
+    flock -n 9 || die "another deploy is running"
+    if rollback; then record rollback ok; log "rolled back"; exit 0; fi
+    record rollback failed; die "rollback did not pass its smoke test"
+    ;;
+  deploy) shift ;;
+  *) die "usage: deploy.sh deploy key=value... | rollback | smoke" ;;
+esac
+
+# --- Arguments.
+declare -A arg=()
+for kv in "$@"; do
+  [[ $kv == *=* ]] || die "argument '$kv' is not key=value"
+  arg[${kv%%=*}]=${kv#*=}
+done
+for key in sha api migrate web vault; do [[ -n ${arg[$key]:-} ]] || die "missing $key=..."; done
+[[ ${arg[sha]} =~ ^[0-9a-f]{40}$ ]] || die "sha must be a full commit id"
+for key in api migrate web; do
+  [[ ${arg[$key]} =~ $IMAGE_RE && ${BASH_REMATCH[1]} == "$key" ]] || die "$key must be the hisaab-$key image pinned by digest"
+done
+[[ ${arg[vault]} =~ ^[A-Za-z0-9-]{3,24}$ ]] || die "vault is not a Key Vault name"
+exec 9>/run/hisaab-deploy.lock
+flock -n 9 || die "another deploy is running"
+[[ -d $EDGE/sites ]] || die "the host is not bootstrapped (Chitthi's deploy/host/bootstrap.sh)"
+# Without this check a missing data disk would put the database on the OS disk, unnoticed.
+[[ -n $TEST_CONFIG_DIR ]] || mountpoint -q /data || die "/data is not mounted"
+for pair in hisaab:$APP_UID hisaab-db:$DB_UID; do
+  name=${pair%%:*} uid=${pair##*:}
+  getent group "$name" >/dev/null || groupadd --system --gid "$uid" "$name"
+  id "$name" >/dev/null 2>&1 || useradd --system --uid "$uid" --gid "$uid" --no-create-home --shell /usr/sbin/nologin "$name"
+done
+install -d -m 0700 "$SRV"
+install -d -m 0711 "$DATA"
+install -d -m 0700 -o "$DB_UID" -g "$DB_UID" "$DATA/pg"
+[[ -f $EDGE/Caddyfile && -f $EDGE/.env && -f $EDGE/compose.yaml ]] || die "the edge is not installed (Chitthi's deploy/host/edge.sh)"
+log "release ${arg[sha]}"
+
+# --- Configuration files at exactly this commit: Hisaab's own, nothing of the edge's.
+files=(deploy/hisaab/compose.yaml deploy/edge/hisaab.caddy)
+for f in "${files[@]}"; do
+  mkdir -p "$work/$(dirname "$f")"
+  # In CI a token means "fetch for real" (test-deploy.sh's first deploy), local copies otherwise.
+  if [[ -n $TEST_CONFIG_DIR && ! -f $work/gh-auth ]]; then
+    cp "$TEST_CONFIG_DIR/$f" "$work/$f"
+  else
+    fetch "$f" "${arg[sha]}" "$work/$f" || die "could not fetch $f at ${arg[sha]}"
+  fi
+done
+[[ -f $work/gh-auth ]] && log "configuration fetched through the GitHub API"
+
+# --- The new site file must validate together with the main Caddyfile and every other app's
+# site file as they are now, in a one-off container run like the edge (same image, uid and
+# capabilities). Checked before anything changes: a broken site file stops the deploy here.
+validate_site() {
+  local image
+  # Readable by the edge uid, like /srv/edge/sites: an unreadable folder would make Caddy's
+  # `import sites/*.caddy` match nothing and "validate" a configuration with no sites at all.
+  rm -rf "$work/sites" && install -d -m 0755 "$work/sites"
+  find "$EDGE/sites" -maxdepth 1 -name '*.caddy' -type f -exec cp {} "$work/sites/" \;
+  cp "$work/deploy/edge/hisaab.caddy" "$work/sites/hisaab.caddy"
+  chmod 0644 "$work/sites"/*.caddy
+  image=$(edge config --images)
+  docker run --rm --network none --read-only --user "$EDGE_UID:$EDGE_UID" --cap-drop ALL --cap-add NET_BIND_SERVICE \
+    --security-opt no-new-privileges --tmpfs "/config:uid=$EDGE_UID,gid=$EDGE_UID,mode=0700" --tmpfs "/data:uid=$EDGE_UID,gid=$EDGE_UID,mode=0700" --env-file "$EDGE/.env" \
+    -v "$EDGE/Caddyfile:/etc/caddy/Caddyfile:ro" -v "$work/sites:/etc/caddy/sites:ro" \
+    "$image" caddy adapt --validate --config /etc/caddy/Caddyfile --adapter caddyfile >"$work/adapted.json" 2>"$work/validate.log" \
+    || return 1
+  # Proof the candidate was really part of what validated, not silently skipped.
+  grep -qF "\"$HOST\"" "$work/adapted.json" || { echo "the adapted configuration has no $HOST site" >> "$work/validate.log"; return 1; }
+}
+validate_site || { tail -n 5 "$work/validate.log" >&2; die "the site file at this commit does not validate with the edge's configuration; nothing was changed"; }
+log "site file validates with the whole edge configuration"
+
+# --- Secrets: Key Vault through the managed identity. Values are never printed, never put on a
+# command line (where other users could read them in /proc), and only written to 0600 files.
+if [[ -z $TEST_SECRETS_DIR ]]; then
+  token=$(curl -fsS --max-time 10 -H Metadata:true \
+    'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net' | jq -r .access_token)
+  [[ -n $token && $token != null ]] || die "no managed identity token for Key Vault"
+  printf 'Authorization: Bearer %s\n' "$token" > "$work/auth"
+  unset token
+fi
+secret() { # <name>: one Key Vault secret, checked for shape
+  local v
+  if [[ -n $TEST_SECRETS_DIR ]]; then
+    v=$(cat "$TEST_SECRETS_DIR/$1")
+  else
+    v=$(curl -fsS --max-time 10 -H @"$work/auth" "https://${arg[vault]}.vault.azure.net/secrets/$1?api-version=7.4" | jq -r .value) \
+      || die "could not read secret $1"
+  fi
+  [[ -n $v && $v != null && $v != *[[:space:]]* ]] || die "secret $1 is empty or contains whitespace"
+  printf '%s' "$v"
+}
+# Each into a variable first: a failing $(secret ...) inside printf's arguments would go unnoticed.
+db_password=$(secret hisaab-postgres-password)
+api_password=$(secret hisaab-api-db-password)
+google_id=$(secret hisaab-google-client-id)
+google_secret=$(secret hisaab-google-client-secret)
+github_id=$(secret hisaab-github-client-id)
+github_secret=$(secret hisaab-github-client-secret)
+for p in "$db_password" "$api_password"; do
+  # Hex or base64url only, so they go into connection URLs without escaping.
+  [[ $p =~ ^[A-Za-z0-9_-]{24,}$ ]] || die "database passwords must be 24+ characters of [A-Za-z0-9_-]"
+done
+{
+  printf 'POSTGRES_PASSWORD=%s\n' "$db_password"
+} > "$work/db.env"
+{
+  printf 'MIGRATE_DATABASE_URL=postgres://hisaab:%s@db:5432/hisaab?sslmode=disable\n' "$db_password"
+  printf 'DATABASE_URL=postgres://hisaab_api:%s@db:5432/hisaab?sslmode=disable\n' "$api_password"
+} > "$work/migrate.env"
+{
+  printf 'DATABASE_URL=postgres://hisaab_api:%s@db:5432/hisaab?sslmode=disable\n' "$api_password"
+  printf 'GOOGLE_CLIENT_ID=%s\nGOOGLE_CLIENT_SECRET=%s\n' "$google_id" "$google_secret"
+  printf 'GITHUB_CLIENT_ID=%s\nGITHUB_CLIENT_SECRET=%s\n' "$github_id" "$github_secret"
+} > "$work/api.env"
+unset db_password api_password google_id google_secret github_id github_secret
+rm -f "$work/auth"
+printf 'HISAAB_API_IMAGE=%s\nHISAAB_MIGRATE_IMAGE=%s\nHISAAB_WEB_IMAGE=%s\nHISAAB_DATA=%s\n' \
+  "${arg[api]}" "${arg[migrate]}" "${arg[web]}" "$DATA" > "$work/.env"
+docker compose -p hisaab --project-directory "$work" -f "$work/deploy/hisaab/compose.yaml" \
+  --env-file "$work/.env" config --quiet 2>/dev/null || die "the compose file at this commit is invalid"
+log "configuration and secrets ready"
+
+# --- Images, by digest, before anything stops. The registry login lives in a throwaway Docker
+# config under $work, so no credential is left in /root/.docker.
+install -d -m 0700 "$work/docker" # empty without a token: anonymous pulls
+if [[ -n $gh_token ]]; then
+  printf '%s' "$gh_token" | DOCKER_CONFIG=$work/docker docker login ghcr.io -u x-access-token --password-stdin >/dev/null 2>&1 \
+    || die "the registry refused the workflow's token"
+  log "signed in to ghcr.io with the workflow's token"
+fi
+unset gh_token
+if [[ -z $TEST_CONFIG_DIR ]]; then
+  for key in api migrate web; do DOCKER_CONFIG=$work/docker docker pull -q "${arg[$key]}" >/dev/null; done
+  log "images pulled"
+fi
+rm -rf "$work/docker" "$work/gh-auth"
+
+# --- Switch. The current release becomes the rollback point (unless this is a re-deploy of it).
+cp "$work/db.env" "$work/migrate.env" "$work/api.env" "$SRV/"
+if [[ -f $SRV/.env ]] && ! cmp -s "$work/.env" "$SRV/.env"; then
+  cp "$SRV/.env" "$SRV/.env.previous"
+  cp "$SRV/compose.yaml" "$SRV/compose.yaml.previous"
+fi
+cp "$work/.env" "$SRV/.env"
+cp "$work/deploy/hisaab/compose.yaml" "$SRV/compose.yaml"
+
+failed() {
+  echo "deploy: $1" >&2
+  if [[ -f $SRV/.env.previous ]] && ! cmp -s "$SRV/.env.previous" "$SRV/.env"; then
+    if rollback; then record "${arg[sha]}" "failed, rolled back"; die "$1; rolled back to the previous release"; fi
+    record "${arg[sha]}" "failed, rollback failed"; die "$1; the rollback failed too: run 'deploy.sh smoke' and see docs/MAINTENANCE.md"
+  fi
+  record "${arg[sha]}" failed
+  die "$1; there is no previous release to roll back to"
+}
+
+app up -d --wait db || failed "Postgres did not become healthy"
+# POSTGRES_PASSWORD only applies when the cluster is first created, so the owner's password is set
+# from Key Vault on every deploy: rotating it is a new secret and a deploy. Through the container's
+# local socket, the statement on stdin (printf is a builtin), never on a command line. The API's
+# password is likewise set from Key Vault by the migrate job on every run.
+owner_password=$(sed -n 's/^POSTGRES_PASSWORD=//p' "$SRV/db.env")
+printf "ALTER ROLE hisaab PASSWORD '%s'" "$owner_password" | app exec -T db psql -X -q -v ON_ERROR_STOP=1 -U hisaab -d postgres >/dev/null \
+  || failed "could not set the database owner's password"
+unset owner_password
+running=$(app ps --status running --services)
+if grep -qx api <<<"$running"; then
+  install -d -m 0700 "$DUMPS"
+  dump=$DUMPS/hisaab-$(date -u +%Y%m%dT%H%M%SZ).dump
+  app exec -T db pg_dump -U hisaab -d hisaab -Fc > "$dump" || failed "the pre-deploy dump failed"
+  # The newest few only: nightly backups (off the VM) are the real history.
+  find "$DUMPS" -name 'hisaab-*.dump' -type f -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP_DUMPS + 1)) | cut -d' ' -f2- | xargs -r rm -f --
+  log "pre-deploy dump: $(du -h "$dump" | cut -f1)"
+fi
+app run --rm migrate || failed "the migrations failed"
+app up -d --wait --remove-orphans api web || failed "the API or web container did not become healthy"
+log "app up"
+
+# --- Edge: only Hisaab's own site file, under the edge lock (edge.sh and other apps' deploys
+# take it too). Validated again against whatever the others have now, then reloaded. If Caddy
+# refuses the reload, the old file goes back: the running configuration never changed, so every
+# site, this one included, keeps being served as before.
+exec 8>/run/edge-deploy.lock
+flock -w 120 8 || failed "another deploy is holding the edge"
+running=$(edge ps --status running --services 2>/dev/null || true)
+grep -qx caddy <<<"$running" || failed "the edge is not running (Chitthi's deploy/host/edge.sh)"
+if ! cmp -s "$work/deploy/edge/hisaab.caddy" "$SITE"; then
+  validate_site || failed "the site file no longer validates with the edge's configuration"
+  [[ -f $SITE ]] && cp "$SITE" "$work/hisaab.caddy.old"
+  cp "$work/deploy/edge/hisaab.caddy" "$SITE"
+  chmod 0644 "$SITE"
+  if ! edge exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile --address unix//run/caddy/admin.sock; then
+    if [[ -f $work/hisaab.caddy.old ]]; then cp "$work/hisaab.caddy.old" "$SITE"; else rm -f "$SITE"; fi
+    failed "Caddy refused the new site file; the old one is back"
+  fi
+  log "edge reloaded with the new site file"
+fi
+flock -u 8
+
+smoke || failed "the smoke test failed"
+record "${arg[sha]}" ok
+log "deployed ${arg[sha]}"
