@@ -16,7 +16,7 @@ async function freePort(): Promise<number> {
 }
 
 /** Starts the real server entrypoint in a child process and resolves once it logs that it is listening. */
-export async function startServer(env: Record<string, string>): Promise<{ child: ChildProcess; url: string }> {
+export async function startServer(env: Record<string, string>): Promise<{ child: ChildProcess; url: string; output: () => string }> {
   const port = await freePort();
   const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
     cwd: apiDir,
@@ -24,9 +24,13 @@ export async function startServer(env: Record<string, string>): Promise<{ child:
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const lines = createInterface({ input: child.stdout });
+  let printed = '';
+  child.stderr.on('data', (chunk: Buffer) => { printed += chunk.toString('utf8'); });
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => { reject(new Error('server did not start within 15s')); }, 15_000);
     lines.on('line', (line) => {
+      printed += `${line}
+`;
       if (line.includes('"api listening"')) {
         clearTimeout(timer);
         resolve();
@@ -37,7 +41,7 @@ export async function startServer(env: Record<string, string>): Promise<{ child:
       reject(new Error(`server exited early with code ${code}`));
     });
   });
-  return { child, url: `http://127.0.0.1:${port}` };
+  return { child, url: `http://127.0.0.1:${port}`, output: () => printed };
 }
 
 /** Runs the server entrypoint and waits for it to exit on its own (for startup-failure tests). */

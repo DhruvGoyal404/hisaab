@@ -32,6 +32,9 @@ const schema = z.object({
   // Where the browser reaches the app; OAuth redirect URIs are built on it. Defaults to the first WEB_ORIGIN.
   PUBLIC_URL: optionalUrl,
   DEV_LOGIN: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  // How many reverse proxies sit in front (production: exactly one, the edge Caddy), so req.ip and
+  // the per-IP sign-in limit see the client, not the proxy. 0 trusts no X-Forwarded-For at all.
+  TRUST_PROXY: z.coerce.number().int().min(0).max(3).default(0),
   GOOGLE_CLIENT_ID: optional,
   GOOGLE_CLIENT_SECRET: optional,
   GITHUB_CLIENT_ID: optional,
@@ -57,6 +60,10 @@ const schema = z.object({
     }
   }
   if (env.NODE_ENV === 'production') {
+    // OAuth redirect URIs and the Origin check are built on these: production must be https.
+    if (env.PUBLIC_URL === undefined) ctx.addIssue({ code: 'custom', path: ['PUBLIC_URL'], message: 'required in production' });
+    else if (!env.PUBLIC_URL.startsWith('https://')) ctx.addIssue({ code: 'custom', path: ['PUBLIC_URL'], message: 'must be https in production' });
+    if (env.WEB_ORIGINS.some((o) => !o.startsWith('https://'))) ctx.addIssue({ code: 'custom', path: ['WEB_ORIGINS'], message: 'must all be https in production' });
     for (const key of ENDPOINT_OVERRIDES) {
       if (env[key] !== undefined) ctx.addIssue({ code: 'custom', path: [key], message: 'endpoint overrides are for tests only' });
     }
@@ -83,6 +90,7 @@ export type Config = {
   webOrigins: string[];
   publicUrl: string;
   devLogin: boolean;
+  trustProxy: number;
   google: GoogleConfig | undefined;
   github: GithubConfig | undefined;
 };
@@ -129,6 +137,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     webOrigins: e.WEB_ORIGINS,
     publicUrl: (e.PUBLIC_URL ?? e.WEB_ORIGINS[0] ?? '').replace(/\/$/, ''),
     devLogin: e.DEV_LOGIN,
+    trustProxy: e.TRUST_PROXY,
     google,
     github,
   };

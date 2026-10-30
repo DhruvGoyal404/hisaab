@@ -17,6 +17,7 @@ export type AppDeps = { config: Config; logger: Logger; pool: pg.Pool; rateLimit
 export function createApp({ config, logger, pool, rateLimits = createRateLimits(pool, logger) }: AppDeps): Express {
   const app = express();
   app.disable('x-powered-by');
+  if (config.trustProxy > 0) app.set('trust proxy', config.trustProxy);
   // helmet's defaults (nosniff, frame and referrer policies, HSTS, COOP/CORP, ...). The API only
   // ever answers with JSON, so its own CSP can forbid everything; the page CSP comes with deploy.
   app.use(helmet({ contentSecurityPolicy: { useDefaults: false, directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } } }));

@@ -37,8 +37,8 @@ describe('dev login guard', () => {
 
 describe('dev login routes without a database', () => {
   const dev = buildApp({ DEV_LOGIN: 'true' });
-  const prod = buildApp({ NODE_ENV: 'production' });
-  afterAll(() => Promise.all([dev.pool.end(), prod.pool.end()]));
+  const off = buildApp(); // DEV_LOGIN defaults to off; production's route table is in production.test.ts
+  afterAll(() => Promise.all([dev.pool.end(), off.pool.end()]));
 
   it('rejects an invalid body with 400 before touching the database', async () => {
     const res = await request(dev.app).post('/api/dev/login').set('Origin', WEB_ORIGIN).send({ name: '' });
@@ -47,7 +47,7 @@ describe('dev login routes without a database', () => {
   });
 
   it('is not mounted when DEV_LOGIN is off', async () => {
-    const res = await request(prod.app).post('/api/dev/login').set('Origin', WEB_ORIGIN).send({ name: 'x' });
+    const res = await request(off.app).post('/api/dev/login').set('Origin', WEB_ORIGIN).send({ name: 'x' });
     expect(res.status).toBe(404);
   });
 });
