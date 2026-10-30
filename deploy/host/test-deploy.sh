@@ -142,7 +142,10 @@ backup restore confirm=hisaab.dhruvgoyal.tech
 [[ $(db <<<"SELECT count(*) FROM pg_tables WHERE tablename = 'written_after_the_backup'") == 0 ]] || fail "the restore did not replace the database"
 [[ $(db <<<"SELECT count(*) FROM users WHERE display_name = 'Backup probe'") == 1 ]] || fail "the restored database lacks the probe"
 sudo find /data/hisaab/pre-deploy -name 'hisaab-pre-restore-*.dump' | grep -q . || fail "the restore kept no copy of the database it replaced"
-if db <<<'UPDATE activity_log SET seq = seq' 2>/dev/null; then fail "activity_log is writable after a restore"; fi
+# From the catalog: this database has no activity rows for a row trigger to fire on.
+append_only=$(db <<<"SELECT (SELECT count(*) FROM pg_trigger WHERE tgrelid = 'activity_log'::regclass AND tgfoid = 'forbid_mutation'::regproc AND tgenabled = 'O'),
+  has_table_privilege('hisaab_app', 'activity_log', 'UPDATE') OR has_table_privilege('hisaab_app', 'activity_log', 'DELETE')")
+[[ $append_only == '2|f' ]] || fail "activity_log lost its append-only rule in the restore: $append_only"
 run smoke >/dev/null || fail "the site does not pass the smoke test after the restore"
 backup restore confirm=hisaab.dhruvgoyal.tech "manifest=${newest_before#"$bt/azure/"}" from=r2 >/dev/null
 run smoke >/dev/null || fail "the site does not pass the smoke test after the restore from R2"
