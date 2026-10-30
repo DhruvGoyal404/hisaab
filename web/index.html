@@ -3,8 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#a3122a" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#6e0c1f" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#a3122a" />
+    <!-- Render-blocking on purpose: the theme is set before anything paints (public/theme.js). -->
+    <script src="/theme.js"></script>
     <meta name="description" content="Split group expenses with friends and settle up in as few payments as possible." />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%23a3122a'/%3E%3Cpath d='M4 26h24' stroke='%23e8a80c' stroke-width='2' stroke-dasharray='3 2'/%3E%3Ctext x='16' y='21' font-family='Georgia,serif' font-size='17' text-anchor='middle' fill='%23fff'%3EH%3C/text%3E%3C/svg%3E" />
     <title>Hisaab</title>

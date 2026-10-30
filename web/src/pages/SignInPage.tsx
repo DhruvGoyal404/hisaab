@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type SubmitEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { Button, btn, ErrorNote, Field, LegalLinks, Loading } from '../components/ui';
+import { Button, btn, ErrorNote, Field, LegalLinks, Loading, ThemePicker } from '../components/ui';
 import { api } from '../lib/api';
 
 /** Only relative paths inside the app, so ?next= can't send someone to another site. */
@@ -90,7 +90,10 @@ export function SignInPage() {
           </form>
         )}
         {p && !p.google && !p.github && !p.dev && <p>Sign-in isn’t set up on this server yet.</p>}
-        <LegalLinks />
+        <div className="space-y-2 border-t border-rule pt-4">
+          <ThemePicker />
+          <LegalLinks />
+        </div>
       </main>
     </div>
   );

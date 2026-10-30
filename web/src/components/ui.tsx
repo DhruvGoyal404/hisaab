@@ -1,5 +1,5 @@
 import { formatPaise } from '@hisaab/money';
-import { useId, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useId, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { ApiError } from '../lib/api';
 import { ConnectionStatus } from '../realtime/ConnectionStatus';
@@ -138,6 +138,32 @@ export function AppShell({
         </div>
       )}
     </div>
+  );
+}
+
+type ThemeChoice = 'system' | 'light' | 'dark';
+declare global {
+  interface Window { hisaabTheme?: { set: (choice: ThemeChoice) => void } }
+}
+const THEMES: [ThemeChoice, string][] = [['system', 'System'], ['light', 'Light'], ['dark', 'Dark']];
+
+/** Light, dark or the device's own: applied and remembered by public/theme.js. */
+export function ThemePicker() {
+  const [choice, setChoice] = useState(() => (document.documentElement.dataset.themeChoice ?? 'system') as ThemeChoice);
+  return (
+    <fieldset role="radiogroup" aria-label="Theme" className="flex flex-wrap items-center gap-x-4">
+      <legend className="sr-only">Theme</legend>
+      <span aria-hidden="true" className="font-medium">Theme</span>
+      {THEMES.map(([value, label]) => (
+        <label key={value} className="inline-flex min-h-11 cursor-pointer items-center gap-2">
+          <input
+            type="radio" name="theme" value={value} checked={choice === value} className="size-4 accent-[var(--accent)]"
+            onChange={() => { window.hisaabTheme?.set(value); setChoice(value); }}
+          />
+          {label}
+        </label>
+      ))}
+    </fieldset>
   );
 }
 

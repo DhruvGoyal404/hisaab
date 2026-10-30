@@ -37,4 +37,9 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
     languageOptions: { globals: globals.node },
   },
+  {
+    // Served as is, before the app: plain browser script.
+    files: ['web/public/**/*.js'],
+    languageOptions: { globals: globals.browser, sourceType: 'script' },
+  },
 );

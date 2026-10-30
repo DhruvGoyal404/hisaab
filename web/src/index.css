@@ -7,7 +7,8 @@
 /*
  * Hisaab's look comes from the bahi-khata, the red cloth-bound ledger: a crimson cover with
  * marigold stitching, ruled pages with a red double margin line, amounts in a right-hand column,
- * and an ink stamp when an account is closed. Contrast is checked for WCAG AA in both schemes.
+ * and an ink stamp when an account is closed. Contrast is checked for WCAG AA in both themes
+ * (src/theme.test.ts).
  */
 :root {
   --page: #fcfcfe;
@@ -32,29 +33,29 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --page: #16142a;
-    --ink: #eceaf6;
-    --muted: #b2afcc;
-    --rule: #2e2b52;
-    --margin-line: #8c3a4a;
-    --band: #6e0c1f;
-    --band-ink: #fff3f5;
-    --thread: #c98f0a;
-    --live: #4ade80;
-    --accent: #ff8a96;
-    --accent-ink: #16142a;
-    --owe: #ff9aa5;
-    --owed: #63dca6;
-    --stamp: #b8b3ff;
-    --field: #1e1c38;
-    --field-line: #7e7aa3;
-    --focus: #ffd166;
-    --danger-bg: #3a1622;
-    --sheet: #1d1b36;
-    color-scheme: dark;
-  }
+/* Dark: public/theme.js sets data-theme before the first paint, from the visitor's choice or the
+   device ("system"). */
+:root[data-theme="dark"] {
+  --page: #16142a;
+  --ink: #eceaf6;
+  --muted: #b2afcc;
+  --rule: #2e2b52;
+  --margin-line: #8c3a4a;
+  --band: #6e0c1f;
+  --band-ink: #fff3f5;
+  --thread: #c98f0a;
+  --live: #4ade80;
+  --accent: #ff8a96;
+  --accent-ink: #16142a;
+  --owe: #ff9aa5;
+  --owed: #63dca6;
+  --stamp: #b8b3ff;
+  --field: #1e1c38;
+  --field-line: #7e7aa3;
+  --focus: #ffd166;
+  --danger-bg: #3a1622;
+  --sheet: #1d1b36;
+  color-scheme: dark;
 }
 
 @theme inline {
@@ -106,6 +107,11 @@
 }
 
 @layer components {
+  /* On the crimson band the page's focus colour has too little contrast (light theme). */
+  .bg-band :focus-visible {
+    outline-color: var(--band-ink);
+  }
+
   /* Amounts line up like a ledger column. */
   .amount {
     font-variant-numeric: tabular-nums;

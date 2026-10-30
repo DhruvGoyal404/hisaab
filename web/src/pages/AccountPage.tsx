@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { AppShell, btn, Button, dateLabel, ErrorNote, LedgerSection, LegalLinks, Loading } from '../components/ui';
+import { AppShell, btn, Button, dateLabel, ErrorNote, LedgerSection, LegalLinks, Loading, ThemePicker } from '../components/ui';
 import { api } from '../lib/api';
 import { useMe } from '../lib/auth';
 import { signInError } from './SignInPage';
@@ -76,6 +76,11 @@ export function AccountPage() {
           <p className="mt-3 text-sm text-muted">
             Linking lets you sign in with either. Accounts are never joined just because the email addresses match.
           </p>
+        </LedgerSection>
+
+        <LedgerSection title="Appearance">
+          <ThemePicker />
+          <p className="mt-1 text-sm text-muted">Remembered on this browser. System follows your device’s setting.</p>
         </LedgerSection>
 
         <LedgerSection title="Sessions">
