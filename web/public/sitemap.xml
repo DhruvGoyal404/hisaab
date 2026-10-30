@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The public pages only: groups are behind sign-in and never listed. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://hisaab.dhruvgoyal.tech/</loc><lastmod>2026-10-31</lastmod></url>
+  <url><loc>https://hisaab.dhruvgoyal.tech/signin</loc><lastmod>2026-10-31</lastmod></url>
+  <url><loc>https://hisaab.dhruvgoyal.tech/privacy</loc><lastmod>2026-10-31</lastmod></url>
+  <url><loc>https://hisaab.dhruvgoyal.tech/terms</loc><lastmod>2026-10-31</lastmod></url>
+</urlset>

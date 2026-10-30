@@ -19,6 +19,7 @@ RUN npm ci --workspace @hisaab/web --include-workspace-root --ignore-scripts
 COPY packages/money/src packages/money/src
 COPY web/tsconfig.json web/index.html web/vite.config.ts web/
 COPY web/src web/src
+COPY web/public web/public
 # Typechecking is CI's job; the image only needs the bundle.
 RUN cd web && ../node_modules/.bin/vite build \
  && find dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' \) -exec gzip -9 -k {} +

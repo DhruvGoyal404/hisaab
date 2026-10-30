@@ -17,6 +17,7 @@
 !web/index.html
 !web/vite.config.ts
 !web/src/
+!web/public/
 !web/Caddyfile
 !db/migrations/
 **/*.test.ts

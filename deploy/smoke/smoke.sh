@@ -92,6 +92,14 @@ grep -qiF 'Strict-Transport-Security: max-age=31536000' <<<"$headers" || fail "n
 grep -qi 'Strict-Transport-Security:.*includeSubDomains' <<<"$headers" && fail "the API's HSTS covers other dhruvgoyal.tech hosts"
 echo "ok   edge: HTTP→HTTPS, HSTS without includeSubDomains, CSPs intact, no Server header"
 
+for want in '/robots.txt|text/plain; charset=utf-8|Disallow: /api/' '/sitemap.xml|application/xml; charset=utf-8|<urlset'; do
+  IFS='|' read -r path type text <<<"$want"
+  got=$(curl_edge -o /dev/null -w '%{http_code} %{content_type}' "https://$host$path")
+  [[ $got == "200 $type" ]] || fail "$path answered '$got'"
+  curl_edge "https://$host$path" | grep -qF "$text" || fail "$path does not hold '$text'"
+done
+echo "ok   robots.txt and sitemap.xml are real files with their own types"
+
 # The Origin allow-list guards every Engine.IO request; the session is checked at Socket.IO connect
 # (the workload covers that: a socket without a session gets "unauthenticated").
 code=$(curl_edge -o /dev/null -w '%{http_code}' -H "Origin: https://evil.example" "https://$host/api/socket.io/?EIO=4&transport=polling")

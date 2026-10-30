@@ -53,6 +53,13 @@ for page in /privacy /terms; do
   [[ $code == 200 ]] && ok "$page answers" || bad "$page got $code"
 done
 
+# Real files with their own types, not the app shell answering 200 for any path.
+for want in '/robots.txt|text/plain; charset=utf-8|Disallow: /api/' '/sitemap.xml|application/xml; charset=utf-8|<urlset'; do
+  IFS='|' read -r path type text <<<"$want"
+  got=$("${c[@]}" -o /dev/null -w '%{http_code} %{content_type}' "https://$HOST$path" || true)
+  [[ $got == "200 $type" ]] && "${c[@]}" "https://$HOST$path" | grep -qF "$text" && ok "$path" || bad "$path got '$got'"
+done
+
 # Nothing but 80 and 443 answers: SSH and Postgres must time out or be refused.
 for port in 22 5432 5434 8081 5174; do
   if timeout 5 bash -c "exec 3<>/dev/tcp/$HOST/$port" 2>/dev/null; then bad "port $port is reachable from the internet"; else ok "port $port closed"; fi
