@@ -3,7 +3,7 @@
 # Runs as root through Azure Run Command (the deploy workflow sends this file):
 #
 #   deploy.sh deploy sha=<git sha> api=<image@digest> migrate=<image@digest> web=<image@digest> \
-#                    vault=<key vault name>
+#                    vault=<key vault name> storage=<account> container=<name> r2_bucket=<name>
 #   deploy.sh rollback      back to the release before the current one (images only)
 #   deploy.sh smoke         check what is running, through the edge and the public hostname
 #
@@ -135,12 +135,15 @@ for kv in "$@"; do
   [[ $kv == *=* ]] || die "argument '$kv' is not key=value"
   arg[${kv%%=*}]=${kv#*=}
 done
-for key in sha api migrate web vault; do [[ -n ${arg[$key]:-} ]] || die "missing $key=..."; done
+for key in sha api migrate web vault storage container r2_bucket; do [[ -n ${arg[$key]:-} ]] || die "missing $key=..."; done
 [[ ${arg[sha]} =~ ^[0-9a-f]{40}$ ]] || die "sha must be a full commit id"
 for key in api migrate web; do
   [[ ${arg[$key]} =~ $IMAGE_RE && ${BASH_REMATCH[1]} == "$key" ]] || die "$key must be the hisaab-$key image pinned by digest"
 done
 [[ ${arg[vault]} =~ ^[A-Za-z0-9-]{3,24}$ ]] || die "vault is not a Key Vault name"
+[[ ${arg[storage]} =~ ^[a-z0-9]{3,24}$ ]] || die "storage is not a storage account name"
+[[ ${arg[container]} =~ ^[a-z0-9-]{3,63}$ ]] || die "container is not a blob container name"
+[[ ${arg[r2_bucket]} =~ ^[a-z0-9-]{3,63}$ ]] || die "r2_bucket is not a bucket name"
 exec 9>/run/hisaab-deploy.lock
 flock -n 9 || die "another deploy is running"
 [[ -d $EDGE/sites ]] || die "the host is not bootstrapped (Chitthi's deploy/host/bootstrap.sh)"
@@ -158,7 +161,7 @@ install -d -m 0700 -o "$DB_UID" -g "$DB_UID" "$DATA/pg"
 log "release ${arg[sha]}"
 
 # --- Configuration files at exactly this commit: Hisaab's own, nothing of the edge's.
-files=(deploy/hisaab/compose.yaml deploy/edge/hisaab.caddy)
+files=(deploy/hisaab/compose.yaml deploy/edge/hisaab.caddy deploy/host/backup.sh)
 for f in "${files[@]}"; do
   mkdir -p "$work/$(dirname "$f")"
   # In CI a token means "fetch for real" (test-deploy.sh's first deploy), local copies otherwise.
@@ -324,3 +327,69 @@ flock -u 8
 smoke || failed "the smoke test failed"
 record "${arg[sha]}" ok
 log "deployed ${arg[sha]}"
+
+# --- Backups: the script at this commit, its configuration, and its timers. Not part of the
+# release's rollback point; a failure from here on fails the deploy without undoing it.
+install -d -m 0700 "$SRV/bin"
+install -m 0700 "$work/deploy/host/backup.sh" "$SRV/bin/backup.sh"
+printf 'VAULT=%s\nAZ_ACCOUNT=%s\nAZ_CONTAINER=%s\nR2_BUCKET=%s\n' \
+  "${arg[vault]}" "${arg[storage]}" "${arg[container]}" "${arg[r2_bucket]}" > "$SRV/backup.conf"
+unit() { # <name> <contents>: written only when it changed
+  if ! cmp -s <(printf '%s\n' "$2") "/etc/systemd/system/$1"; then
+    printf '%s\n' "$2" > "/etc/systemd/system/$1"
+    chmod 0644 "/etc/systemd/system/$1"
+  fi
+}
+for job in backup:run restore-drill:drill; do
+  unit "hisaab-${job%%:*}.service" "[Unit]
+Description=Hisaab ${job%%:*} (deploy/host/backup.sh ${job#*:})
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=$SRV/bin/backup.sh ${job#*:}
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=256M
+TimeoutStartSec=2h"
+done
+# 02:20 IST, after Chitthi's and before the 03:00 IST reboot window; the drill on the 1st, after it.
+unit hisaab-backup.timer "[Unit]
+Description=Nightly Hisaab backup
+
+[Timer]
+OnCalendar=*-*-* 20:50:00 UTC
+RandomizedDelaySec=10m
+Persistent=true
+
+[Install]
+WantedBy=timers.target"
+unit hisaab-restore-drill.timer "[Unit]
+Description=Monthly Hisaab restore drill
+
+[Timer]
+OnCalendar=*-*-01 23:20:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target"
+systemctl daemon-reload
+systemctl enable --now hisaab-backup.timer hisaab-restore-drill.timer >/dev/null 2>&1
+[[ -f $SRV/backup-installed-at ]] || date -u +%s > "$SRV/backup-installed-at"
+
+# Asserted on every deploy: both timers live, and the last backup under 26 hours old (once the
+# first night is behind us).
+for t in hisaab-backup.timer hisaab-restore-drill.timer; do
+  if ! systemctl is-active --quiet "$t" || ! systemctl is-enabled --quiet "$t"; then die "deployed, but $t is not active and enabled"; fi
+done
+now=$(date -u +%s)
+if [[ -f $DATA/backup-state/last-success ]]; then
+  age_h=$(( (now - $(stat -c %Y "$DATA/backup-state/last-success")) / 3600 ))
+  (( age_h < 26 )) || die "deployed, but the last successful backup is ${age_h} hours old"
+  log "backups: timers active, last backup ${age_h} h ago"
+elif (( now - $(cat "$SRV/backup-installed-at") > 26 * 3600 )); then
+  die "deployed, but no backup has succeeded since the timers were installed over 26 hours ago"
+else
+  log "backups: timers active; the first backup runs tonight at 02:20 IST"
+fi

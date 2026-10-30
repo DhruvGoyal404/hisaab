@@ -8,6 +8,10 @@
 #   3. a release whose API exits at once: must fail, roll itself back, previous release serving
 #   4. a release whose site file is broken: must fail before changing anything
 #   5. an explicit rollback after a good second release
+#   6. backups: two nightly runs (append-only; the disk warning), a restore drill that passes, a
+#      backup key rotation (drill and restore read both keys), a real restore (from Azure, then
+#      from R2) that keeps the database's append-only rule, a tampered dump that the drill
+#      catches, and a re-deploy that finds the timers and a fresh backup
 set -euo pipefail
 
 repo=$(cd "$(dirname "$0")/../.." && pwd)
@@ -29,7 +33,7 @@ extra=() # set for one release at a time
 run() { sudo env "${hooks[@]}" "$repo/deploy/host/deploy.sh" "$@"; }
 release() { # <api tag> [config dir]
   sudo env "${hooks[@]}" "${extra[@]}" ${2:+HISAAB_TEST_CONFIG_DIR="$2"} "$repo/deploy/host/deploy.sh" deploy \
-    "sha=$sha" vault=ci-vault "api=hisaab-api:$1" migrate=hisaab-migrate:ci web=hisaab-web:ci
+    "sha=$sha" vault=ci-vault "api=hisaab-api:$1" migrate=hisaab-migrate:ci web=hisaab-web:ci storage=cistorage container=hisaab-backups r2_bucket=hisaab-backups
 }
 current_api() { sudo grep -h '^HISAAB_API_IMAGE=' /srv/hisaab/.env | cut -d= -f2-; }
 edge_files() { sudo sha256sum /srv/edge/sites/other.caddy /srv/edge/Caddyfile /srv/edge/compose.yaml /srv/edge/.env; }
@@ -96,6 +100,62 @@ release second
 run rollback
 [[ $(current_api) == hisaab-api:ci ]] || fail "rollback did not restore the previous release"
 echo "ok   5. explicit rollback to the previous release"
+
+# --- 6. Backups, with local folders standing in for Azure Blob and R2.
+bt=$(mktemp -d)
+mkdir -p "$bt/secrets"
+age-keygen -o "$bt/secrets/hisaab-backup-age-identity" 2>/dev/null
+age-keygen -y "$bt/secrets/hisaab-backup-age-identity" > "$bt/secrets/hisaab-backup-age-recipient"
+backup() { sudo env HISAAB_BACKUP_TEST_DIR="$bt" /srv/hisaab/bin/backup.sh "$@"; }
+db() { sudo docker compose -p hisaab --project-directory /srv/hisaab exec -T db psql -X -q -At -v ON_ERROR_STOP=1 -U hisaab -d hisaab; }
+
+db <<<"INSERT INTO users (display_name) VALUES ('Backup probe')"
+backup run
+sleep 1
+out=$(sudo env HISAAB_BACKUP_TEST_DIR="$bt" HISAAB_BACKUP_DISK_WARN_PCT=0 /srv/hisaab/bin/backup.sh run)
+echo "$out"
+grep -q 'WARNING: /data is [0-9]*% full' <<<"$out" || fail "the nightly run did not warn about the disk at its threshold"
+dumps=$(sudo find "$bt/azure/db" -name '*.dump.age' | wc -l)
+[[ $dumps -eq 2 ]] || fail "two backups should leave two dumps, found $dumps"
+[[ $(sudo find "$bt/azure/manifests" -name '*.json' | wc -l) -eq 2 ]] || fail "two backups should leave two manifests"
+[[ $(sudo find "$bt/r2/db" -name '*.dump.age' | wc -l) -eq 2 ]] || fail "the R2 copy is incomplete"
+if sudo grep -q 'Backup probe' "$(sudo find "$bt/azure/db" -name '*.dump.age' | head -n 1)"; then fail "the dump is not encrypted"; fi
+echo "ok   6a. two nightly backups: two dumps and manifests, R2 in step, dumps encrypted"
+
+backup drill
+echo "ok   6b. restore drill: checksums, decryption, restore, counts, schema version, R2 copy"
+
+# Key rotation: the old private key becomes -previous, a new pair takes over.
+newest_before=$(sudo find "$bt/azure/manifests" -name '*.json' | sort | tail -n 1)
+sudo mv "$bt/secrets/hisaab-backup-age-identity" "$bt/secrets/hisaab-backup-age-identity-previous"
+age-keygen -o "$bt/secrets/hisaab-backup-age-identity" 2>/dev/null
+age-keygen -y "$bt/secrets/hisaab-backup-age-identity" > "$bt/secrets/hisaab-backup-age-recipient"
+sleep 1
+backup run >/dev/null
+backup drill
+echo "ok   6c. after a key rotation, the drill reads the new dump"
+
+# A real restore: a table appears that the backup never had, and the old-key dump must still open.
+db <<<'CREATE TABLE written_after_the_backup (x int)'
+if backup restore 2>/dev/null; then fail "a restore ran without confirm="; fi
+backup restore confirm=hisaab.dhruvgoyal.tech
+[[ $(db <<<"SELECT count(*) FROM pg_tables WHERE tablename = 'written_after_the_backup'") == 0 ]] || fail "the restore did not replace the database"
+[[ $(db <<<"SELECT count(*) FROM users WHERE display_name = 'Backup probe'") == 1 ]] || fail "the restored database lacks the probe"
+sudo find /data/hisaab/pre-deploy -name 'hisaab-pre-restore-*.dump' | grep -q . || fail "the restore kept no copy of the database it replaced"
+if db <<<'UPDATE activity_log SET seq = seq' 2>/dev/null; then fail "activity_log is writable after a restore"; fi
+run smoke >/dev/null || fail "the site does not pass the smoke test after the restore"
+backup restore confirm=hisaab.dhruvgoyal.tech "manifest=${newest_before#"$bt/azure/"}" from=r2 >/dev/null
+run smoke >/dev/null || fail "the site does not pass the smoke test after the restore from R2"
+echo "ok   6d. restore: refused without confirm=; database replaced (old one kept), activity log still append-only, site healthy; again from R2 with an old-key dump"
+
+newest=$(sudo find "$bt/azure/db" -name '*.dump.age' | sort | tail -n 1)
+echo tampered | sudo tee -a "$newest" >/dev/null
+if backup drill 2>/dev/null; then fail "the drill passed on a tampered dump"; fi
+echo "ok   6e. the drill catches a tampered dump"
+
+release ci | tee "$bt/deploy.log"
+grep -q 'backups: timers active, last backup 0 h ago' "$bt/deploy.log" || fail "the deploy did not confirm the timers and a fresh backup"
+echo "ok   6f. a deploy asserts both timers and the fresh backup"
 
 [[ $(edge_files) == "$before" ]] || { diff <(echo "$before") <(edge_files) >&2; fail "Hisaab's deploys changed a file that isn't theirs"; }
 [[ $(other_site) == 'the other app' ]] || fail "the second app's site stopped being served"

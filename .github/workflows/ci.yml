@@ -137,6 +137,8 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: Smoke-test and measure the production stack
         run: deploy/smoke/smoke.sh hisaab-api:ci hisaab-migrate:ci hisaab-web:ci
+      - name: Install age, as the host has it
+        run: sudo apt-get install -y -q --no-install-recommends age
       - name: Deploy, re-deploy, a broken deploy that rolls itself back, explicit rollback
         env:
           HISAAB_TEST_GITHUB_TOKEN: ${{ github.token }}
