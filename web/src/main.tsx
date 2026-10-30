@@ -21,6 +21,7 @@ const queryClient = new QueryClient({
 
 // Less-visited screens load on demand to keep the first load small.
 const expensePages = () => import('./pages/expense/ExpensePages');
+const legalPages = () => import('./pages/LegalPages');
 
 const router = createBrowserRouter([
   { path: '/signin', element: <SignInPage /> },
@@ -37,6 +38,8 @@ const router = createBrowserRouter([
       { path: '/join/:token', lazy: async () => ({ Component: (await import('./pages/JoinPage')).JoinPage }) },
     ],
   },
+  { path: '/privacy', lazy: async () => ({ Component: (await legalPages()).PrivacyPage }) },
+  { path: '/terms', lazy: async () => ({ Component: (await legalPages()).TermsPage }) },
   { path: '/status', lazy: async () => ({ Component: (await import('./pages/HealthPage')).HealthPage }) },
 ]);
 

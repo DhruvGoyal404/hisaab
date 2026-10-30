@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { AppShell, btn, Button, dateLabel, ErrorNote, LedgerSection, Loading } from '../components/ui';
+import { AppShell, btn, Button, dateLabel, ErrorNote, LedgerSection, LegalLinks, Loading } from '../components/ui';
 import { api } from '../lib/api';
 import { useMe } from '../lib/auth';
 import { signInError } from './SignInPage';
@@ -105,6 +105,7 @@ export function AccountPage() {
           )}
           <ErrorNote error={deleteAccount.error} />
         </LedgerSection>
+        <LegalLinks />
       </div>
     </AppShell>
   );

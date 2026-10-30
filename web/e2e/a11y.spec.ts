@@ -31,6 +31,10 @@ for (const scheme of ['light', 'dark'] as const) {
       await expectAccessible(signIn, 'sign in');
       await signIn.getByRole('button', { name: 'Sign in' }).click(); // with its error showing
       await expectAccessible(signIn, 'sign in, error');
+      for (const path of ['/privacy', '/terms']) {
+        await signIn.goto(path);
+        await expectAccessible(signIn, path);
+      }
       await anon.close();
 
       await page.goto('/');

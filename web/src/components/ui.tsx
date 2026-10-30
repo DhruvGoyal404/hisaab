@@ -142,6 +142,13 @@ export function AppShell({
 }
 
 /** Sentence-start capital: "you paid" -> "You paid". */
+export const LegalLinks = () => (
+  <p className="text-sm text-muted">
+    <Link to="/privacy" className="underline underline-offset-2">Privacy</Link> and{' '}
+    <Link to="/terms" className="underline underline-offset-2">terms</Link>
+  </p>
+);
+
 export const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 export const dateLabel = (iso: string): string =>
