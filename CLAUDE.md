@@ -42,7 +42,7 @@ npm run e2e -w web               # Playwright on its own throwaway DB with fresh
 | 4 | Real-time | Tests: non-member can't subscribe, bad Origin rejected, two clients converge after one misses N events while offline. **Done** (see docs/REALTIME.md). |
 | 5 | Frontend | Playwright e2e: create group → invite → add each split type → settle → balances reach zero in both browsers. **Done** (web/e2e/journey.spec.ts). |
 | 6 | Auth + limits | Tests for rate limiting (429), Origin rejection, session revocation killing sockets, invite expiry; dev login refuses to start outside development/test. **Done.** |
-| 7 | Deploy | Public URL; backup restore tested; rollback documented; no secret in repo or image |
+| 7 | Deploy | Public URL; backup restore tested; rollback documented; no secret in repo or image. **Done** 2026-10-31: live at https://hisaab.dhruvgoyal.tech on the shared VM; `hisaab-up.sh` exit 0; `backup.sh` selftest, run and drill passed; `rehearse-rollback` rolled itself back; down → up → down all exit 0 with data intact (see docs/MAINTENANCE.md). |
 
 ## Invariants (do not break these)
 

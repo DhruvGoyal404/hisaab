@@ -25,7 +25,7 @@ Everything here is yours, except where it says otherwise.
 3. **GitHub:** a new OAuth app, homepage as above, callback `https://hisaab.dhruvgoyal.tech/api/auth/github/callback`.
 4. **R2:** bucket `hisaab-backups`. A bucket lock rule on the whole bucket for 30 days. Lifecycle rules deleting `db/`, `manifests/` and `selftest/` after 35 days. An API token limited to that bucket, Object Read and Write.
 5. **healthchecks.io:** checks `hisaab-backup` (daily) and `hisaab-drill` (monthly), and a read-write API key for that project.
-6. **UptimeRobot:** an HTTPS monitor on `https://hisaab.dhruvgoyal.tech/api/health`.
+6. **UptimeRobot:** a Keyword monitor on `https://hisaab.dhruvgoyal.tech/api/health` for `"db":"ok"`, so a site that answers but has lost its database counts as down. The up and down scripts find it by URL.
 7. **Azure Cloud Shell:** `git clone https://github.com/DhruvGoyal404/hisaab && cd hisaab`, then `bash deploy/azure/setup.sh app`, then `bash deploy/azure/setup.sh secrets`. The second asks for the values above, hidden, and generates the database passwords and the backup keys. Keep a copy of the backup private key in a password manager: without it no backup can be read.
 8. **GitHub repo settings:** environment `production` with you as required reviewer, deploys from `main` only. Add the secrets and variables that `bash deploy/azure/setup.sh summary` prints. Set the repository variable `DEPLOY_ENABLED=true` last.
 9. **First deploy:** `bash hisaab-up.sh` starts the VM and sets DNS, then stops at the health check because nothing is deployed yet. Run Actions > Deploy > Run workflow and approve it. Then `bash hisaab-up.sh` again.
@@ -47,6 +47,7 @@ bash hisaab-down.sh    # stops what bills; ends with an audit
 - If Chitthi is up, `hisaab-down.sh` does Hisaab's steps, marks it down and leaves the VM running, because the VM is what Chitthi is using. It says so, and `bash chitthi-down.sh` then stops the costs. Hisaab's containers keep running on the VM, unreachable.
 - If you want both down, order doesn't matter: the second down script takes the host.
 - If the VM came up for Chitthi, `bash hisaab-up.sh --app-only` brings Hisaab back without touching the host.
+- **A legacy `hosted` tag counts as up.** Before chitthi#1 the tag said `hosted`; any value other than `down` means up, so a stale one keeps the VM running. Seen at go-live on 2026-10-31: `hisaab-down.sh` left the VM running for Chitthi, which was already down. Run `bash chitthi-down.sh` once: it rewrites the tag as `down` (and takes the host if nothing else is up). The VM's Tags blade in the portal shows the current values.
 
 ## Deploy and rollback
 
