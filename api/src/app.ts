@@ -28,7 +28,9 @@ export function createApp({ config, logger, pool, rateLimits = createRateLimits(
 
   app.use(pinoHttp({ logger }));
   app.use(requireAllowedOrigin(config.webOrigins));
-  app.use(express.json({ limit: '100kb' }));
+  // Never decompress: no client compresses, and body-parser < 2.4.0 crashes on a crafted gzip body
+  // (GHSA-27r3-jxmh-p828). Keep this even after upgrading; it is less work an attacker can cause.
+  app.use(express.json({ limit: '100kb', inflate: false }));
 
   const api = express.Router();
   api.use(healthRouter(pool));

@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 import request from 'supertest';
 import { afterAll, describe, expect, it } from 'vitest';
 import { buildApp, WEB_ORIGIN } from './helpers.js';
@@ -24,6 +25,18 @@ describe('error handling', () => {
       .send(JSON.stringify({ blob: 'x'.repeat(200_000) }));
     expect(res.status).toBe(413);
     expect(res.body).toMatchObject({ error: { code: 'payload_too_large' } });
+  });
+
+  // GHSA-27r3-jxmh-p828: trailing bytes after a gzip frame crashed the process in body-parser < 2.4.0.
+  it('refuses a compressed body instead of decompressing it', async () => {
+    const res = await request(app)
+      .post('/api/health')
+      .set('Origin', WEB_ORIGIN)
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'gzip')
+      .send(Buffer.concat([gzipSync('{}'), Buffer.from('trailing')]));
+    expect(res.status).toBe(415);
+    expect(res.body).toMatchObject({ error: { code: 'invalid_body' } });
   });
 
   it('returns a JSON 404 for unknown routes', async () => {

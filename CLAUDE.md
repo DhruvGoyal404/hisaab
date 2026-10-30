@@ -51,7 +51,7 @@ npm run e2e -w web               # Playwright on its own throwaway DB with fresh
 - **The activity log is append-only, enforced by the DB** (trigger plus REVOKE), not just by app code.
 - **Sessions are opaque tokens, stored hashed (SHA-256) at rest.** No JWT. HttpOnly cookie. **Origin check on every non-GET request.**
 - **Clients never write over the socket.** All writes go through REST; sockets only notify.
-- **Dependencies: exact versions pinned, and only releases at least 14 days old.** `.npmrc` has `save-exact=true`. Normal installs and CI use `npm ci` (lockfile only, no resolution). The `--before` cutoff applies only when adding or upgrading: `npm install <pkg>@<version> --before=<date 14 days ago>`, which also keeps newly resolved transitive deps at least 14 days old. CI fails on `npm audit --audit-level=high`.
+- **Dependencies: exact versions pinned, and only releases at least 14 days old.** `.npmrc` has `save-exact=true`. Normal installs and CI use `npm ci` (lockfile only, no resolution). The `--before` cutoff applies only when adding or upgrading: `npm install <pkg>@<version> --before=<date 14 days ago>`, which also keeps newly resolved transitive deps at least 14 days old. CI fails on any high advisory (`scripts/audit-gate.mjs`: `npm audit` plus dated, self-expiring exceptions).
 - Node stays on the machine's 22.19 while CodeJudge runs, so React Router 7 and jsdom 29 (their next majors need Node ≥ 22.22).
 - The dev login (`/api/dev/login`) exists only when `NODE_ENV` is `development` or `test`; the API refuses to start if it is enabled anywhere else.
 
