@@ -4,11 +4,8 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
-const EXCEPTIONS = [
-  // body-parser 2.4.0 fixes this but is under the 14-day rule until this date. Not reachable:
-  // api/src/app.ts sets inflate: false, and api/test/app.test.ts proves it. On expiry, upgrade.
-  { url: 'https://github.com/advisories/GHSA-27r3-jxmh-p828', until: '2026-11-05' },
-];
+// Each: { url: '<advisory URL>', until: 'YYYY-MM-DD' }, with a comment on why it can't be reached.
+const EXCEPTIONS = [];
 
 const file = process.argv[2];
 const raw = file
